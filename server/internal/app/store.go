@@ -45,6 +45,7 @@ type User struct {
 	Role        Role      `json:"role"`
 	Status      Status    `json:"status"`
 	Platform    string    `json:"platform"`
+	Phone       string    `json:"phone,omitempty"`
 	CreatedAt   time.Time `json:"createdAt"`
 	TokenHash   string    `json:"tokenHash"`
 	Devices     Devices   `json:"devices"`

@@ -1,0 +1,52 @@
+# Generate the Xcode project with:  brew install xcodegen && cd ios && xcodegen
+# Before building, set DEVELOPMENT_TEAM and PRODUCT_BUNDLE_IDENTIFIER below
+# (and use the same bundle ID in the server's WALKIE_APNS_BUNDLE_ID).
+name: Walkie
+options:
+  bundleIdPrefix: com.debayandatta
+  deploymentTarget:
+    iOS: "16.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    DEVELOPMENT_TEAM: "YOUR_TEAM_ID"
+    MARKETING_VERSION: "1.0.0"
+    CURRENT_PROJECT_VERSION: "1"
+    SWIFT_VERSION: "5.9"
+    SWIFT_STRICT_CONCURRENCY: minimal
+    ENABLE_PREVIEWS: YES
+targets:
+  Walkie:
+    type: application
+    platform: iOS
+    sources:
+      - path: Walkie
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.debayandatta.walkie
+        TARGETED_DEVICE_FAMILY: "1"
+        CODE_SIGN_ENTITLEMENTS: Walkie/Walkie.entitlements
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        GENERATE_INFOPLIST_FILE: NO
+        INFOPLIST_FILE: Walkie/Info.plist
+    info:
+      path: Walkie/Info.plist
+      properties:
+        CFBundleDisplayName: Walkie
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSRequiresIPhoneOS: true
+        UILaunchScreen:
+          UIColorName: LaunchBackground
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        UIUserInterfaceStyle: Dark
+        UIBackgroundModes: [push-to-talk, remote-notification]
+        NSMicrophoneUsageDescription: Walkie uses the microphone only while you hold the talk button, or while hands-free is on.
+        NSLocationWhenInUseUsageDescription: Walkie shares your location with your family only when you send an SOS.
+        NSCameraUsageDescription: Scan a family invite QR code.
+        ITSAppUsesNonExemptEncryption: false
+        CFBundleURLTypes:
+          - CFBundleURLName: com.debayandatta.walkie.join
+            CFBundleURLSchemes: [walkie]
+        LSApplicationQueriesSchemes: [tel, sms]

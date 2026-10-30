@@ -487,3 +487,25 @@ func TestJoinPageLinksToApp(t *testing.T) {
 		t.Fatalf("app link missing:\n%s", page)
 	}
 }
+
+func TestProfilePhone(t *testing.T) {
+	e := newEnv(t)
+	admin, ma, _ := e.family("ios")
+	if st := e.do("PUT", "/v1/me", ma.Token, map[string]string{"phone": "+91 98765-43210"}, nil); st != 200 {
+		t.Fatalf("phone %d", st)
+	}
+	if st := e.do("PUT", "/v1/me", ma.Token, map[string]string{"phone": "call me"}, nil); st != 400 {
+		t.Fatalf("bad phone accepted")
+	}
+	var users struct{ Users []UserView }
+	e.do("GET", "/v1/users", admin.Token, nil, &users)
+	found := false
+	for _, u := range users.Users {
+		if u.ID == ma.User.ID && u.Phone == "+919876543210" && u.Name == "Ma" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("phone not visible %+v", users.Users)
+	}
+}

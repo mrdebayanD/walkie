@@ -19,6 +19,7 @@ type UserView struct {
 	Role     Role   `json:"role"`
 	Status   Status `json:"status"`
 	Platform string `json:"platform"`
+	Phone    string `json:"phone,omitempty"`
 	Online   bool   `json:"online"`
 	Duty     bool   `json:"duty"`
 }
@@ -41,7 +42,7 @@ type InviteView struct {
 
 func (s *Server) userView(u *User) UserView {
 	online, duty := s.hub.Presence(u.ID)
-	return UserView{ID: u.ID, Name: u.Name, Role: u.Role, Status: u.Status, Platform: u.Platform, Online: online, Duty: duty}
+	return UserView{ID: u.ID, Name: u.Name, Role: u.Role, Status: u.Status, Platform: u.Platform, Phone: u.Phone, Online: online, Duty: duty}
 }
 
 func (s *Server) channelView(st *state, c *Channel) ChannelView {
@@ -68,6 +69,27 @@ func cleanName(n string, max int) (string, error) {
 		}
 	}
 	return n, nil
+}
+
+// cleanPhone keeps a leading + and digits; empty clears the number.
+func cleanPhone(p string) (string, error) {
+	var b strings.Builder
+	for i, r := range strings.TrimSpace(p) {
+		switch {
+		case r >= '0' && r <= '9':
+			b.WriteRune(r)
+		case r == '+' && i == 0:
+			b.WriteRune(r)
+		case r == ' ' || r == '-' || r == '(' || r == ')':
+		default:
+			return "", errors.New("phone number has invalid characters")
+		}
+	}
+	out := b.String()
+	if out != "" && (len(out) < 6 || len(out) > 16) {
+		return "", errors.New("phone number length looks wrong")
+	}
+	return out, nil
 }
 
 var allowedColors = map[string]bool{"green": true, "blue": true, "orange": true, "pink": true, "purple": true, "red": true, "teal": true, "yellow": true}
@@ -197,16 +219,26 @@ func (s *Server) handleMe(w http.ResponseWriter, r *http.Request, u User) {
 
 func (s *Server) handleUpdateMe(w http.ResponseWriter, r *http.Request, u User) {
 	var req struct {
-		Name string `json:"name"`
+		Name  *string `json:"name"`
+		Phone *string `json:"phone"`
 	}
 	if err := readJSON(r, &req); err != nil {
 		writeErr(w, http.StatusBadRequest, "bad_request", "Invalid request")
 		return
 	}
-	name, err := cleanName(req.Name, 40)
-	if err != nil {
-		writeErr(w, http.StatusBadRequest, "bad_name", err.Error())
-		return
+	var name, phone string
+	var err error
+	if req.Name != nil {
+		if name, err = cleanName(*req.Name, 40); err != nil {
+			writeErr(w, http.StatusBadRequest, "bad_name", err.Error())
+			return
+		}
+	}
+	if req.Phone != nil {
+		if phone, err = cleanPhone(*req.Phone); err != nil {
+			writeErr(w, http.StatusBadRequest, "bad_phone", err.Error())
+			return
+		}
 	}
 	var out User
 	err = s.store.Update(func(st *state) error {
@@ -214,7 +246,12 @@ func (s *Server) handleUpdateMe(w http.ResponseWriter, r *http.Request, u User) 
 		if x == nil {
 			return ErrNotFound
 		}
-		x.Name = name
+		if req.Name != nil {
+			x.Name = name
+		}
+		if req.Phone != nil {
+			x.Phone = phone
+		}
 		out = *x
 		return nil
 	})

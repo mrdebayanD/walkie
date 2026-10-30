@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- "development" for Xcode installs; Xcode switches it to "production" for TestFlight/App Store archives. -->
+	<key>aps-environment</key>
+	<string>development</string>
+	<key>com.apple.developer.push-to-talk</key>
+	<true/>
+	<key>com.apple.developer.usernotifications.time-sensitive</key>
+	<true/>
+	<!-- Only add this after Apple approves a Critical Alerts request (see docs/IOS_SETUP.md):
+	<key>com.apple.developer.usernotifications.critical-alerts</key>
+	<true/>
+	-->
+</dict>
+</plist>
