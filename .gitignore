@@ -1,0 +1,26 @@
+# Server
+server/data/
+server/walkie
+*.p8
+service-account*.json
+.env
+
+# iOS
+ios/*.xcodeproj
+ios/build/
+ios/DerivedData/
+xcuserdata/
+*.xcuserstate
+
+# Android
+android/.gradle/
+android/build/
+android/app/build/
+android/concentus/build/
+android/local.properties
+android/app/google-services.json
+*.keystore
+*.jks
+.idea/
+
+.DS_Store
