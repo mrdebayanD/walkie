@@ -298,24 +298,29 @@ func (h *Hub) requestFloor(c *conn, channel, mode, sosID string) {
 	h.sendLocked(c, encode(map[string]any{"t": "floor_granted", "channel": channel, "txId": txID, "maxMs": limit.Milliseconds()}))
 
 	taken := encode(floorTakenMsg(f))
-	var offline []string
+	var others []string
+	offline := map[string]bool{}
 	for _, uid := range members {
 		if uid == c.userID {
 			continue
 		}
+		others = append(others, uid)
 		cs := h.userConnsLocked(uid)
 		if len(cs) == 0 {
-			offline = append(offline, uid)
+			offline[uid] = true
 		}
 		for _, oc := range cs {
 			h.sendLocked(oc, taken)
 		}
 	}
 	// Wake phones that are asleep (iPhone PTT push / Android FCM).
-	go h.pushTx(offline, f.channel, txID, c.name)
+	go h.pushTx(others, offline, f.channel, txID, c.name)
 }
 
-func (h *Hub) pushTx(userIDs []string, channel string, txID uint32, speaker string) {
+// pushTx wakes listeners: iPhones only when they have no live connection;
+// Android phones always, because Doze can freeze a socket that still looks
+// connected. The Android app ignores the push when it is already playing.
+func (h *Hub) pushTx(userIDs []string, offline map[string]bool, channel string, txID uint32, speaker string) {
 	if len(userIDs) == 0 {
 		return
 	}
@@ -326,6 +331,9 @@ func (h *Hub) pushTx(userIDs []string, channel string, txID uint32, speaker stri
 		for _, id := range userIDs {
 			u := st.Users[id]
 			if u == nil || u.Status != StatusActive {
+				continue
+			}
+			if u.Platform != "android" && !offline[id] {
 				continue
 			}
 			if t, ok := h.lastPushed[id]; ok && now.Sub(t) < 3*time.Second {

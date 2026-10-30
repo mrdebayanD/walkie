@@ -509,3 +509,17 @@ func TestProfilePhone(t *testing.T) {
 		t.Fatalf("phone not visible %+v", users.Users)
 	}
 }
+
+func TestAndroidAlwaysWokenIOSOnlyWhenOffline(t *testing.T) {
+	e := newEnv(t)
+	admin, ma, family := e.family("android")
+	e.do("PUT", "/v1/me/push", ma.Token, map[string]any{"fcm": "MAFCM"}, nil)
+	e.connect(ma.Token, true) // connected, but Doze may have frozen it
+	a := e.connect(admin.Token, true)
+	a.sendJSON(map[string]any{"t": "floor_request", "channel": family, "mode": "hold"})
+	a.expect("floor_granted")
+	time.Sleep(200 * time.Millisecond)
+	if !e.push.has("fcm:MAFCM:tx") {
+		t.Fatalf("connected Android member not woken: %v", e.push.sent)
+	}
+}

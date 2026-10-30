@@ -74,7 +74,8 @@ final class AppModel: ObservableObject {
     private var relay: Relay?
     private var talkTimer: Timer?
     private var grantedTx: UInt32?
-    private var preGrant: [[Data]] = []
+    /// Outgoing audio goes straight from the audio thread to the socket, in order.
+    private let gate = TxGate()
     private var sessionActive = false
     private var heldRemote: [Data] = []
     private var pendingSOSClip: String?
@@ -86,9 +87,8 @@ final class AppModel: ObservableObject {
     private init() {
         audio.speakerMuted = speakerMuted
         playedClips = Set(UserDefaults.standard.stringArray(forKey: "playedClips") ?? [])
-        audio.onPackets = { [weak self] packets in
-            Task { @MainActor in self?.outgoing(packets) }
-        }
+        let gate = self.gate
+        audio.onPackets = { packets in gate.push(packets) }
         audio.onLevel = { [weak self] l in
             Task { @MainActor in self?.level = l }
         }
@@ -132,10 +132,13 @@ final class AppModel: ObservableObject {
         } catch let e as APIError where e.status == 401 {
             signOut() // removed by the admin
         } catch {
-            // Offline: stay where we are (the loading screen shows the message) and retry.
-            errorMessage = "Can't reach the server. Retrying…"
-            DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self] in
-                Task { await self?.refreshMe() }
+            // Offline. On the loading screen, show it and retry; once running,
+            // the relay's own reconnect handles it quietly.
+            if phase == .loading || phase == .pending {
+                errorMessage = "Can't reach the server. Retrying…"
+                DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self] in
+                    Task { await self?.refreshMe() }
+                }
             }
         }
     }
@@ -160,6 +163,7 @@ final class AppModel: ObservableObject {
         r.duty = onDuty
         r.onEvent = { [weak self] e in self?.handle(e) }
         relay = r
+        gate.relay = r
         r.connect()
         if onDuty, let ch = selectedChannel { ptt.join(channelId: ch.id, name: ch.name) }
         await registerNotifications()
@@ -280,6 +284,11 @@ final class AppModel: ObservableObject {
             ptt.setConnected(false)
             if talk.isActive { endTalk() }
             if remote != nil { remoteEnded() }
+            // If the admin removed this phone, the server now refuses us: find out and sign out.
+            Task {
+                try? await Task.sleep(nanoseconds: 1_500_000_000)
+                if !connected { await refreshMe() }
+            }
         case .welcome:
             break
         case .floorGranted(_, let tx, _):
@@ -289,8 +298,7 @@ final class AppModel: ObservableObject {
             }
             grantedTx = tx
             talk = .talking(mode, since: Date())
-            for b in preGrant { relay?.sendAudio(b) }
-            preGrant.removeAll()
+            gate.grant()
             Haptics.start()
             talkTimer?.invalidate()
             talkTimer = Timer.scheduledTimer(withTimeInterval: mode.limit, repeats: false) { [weak self] _ in
@@ -383,7 +391,7 @@ final class AppModel: ObservableObject {
         }
         talk = .requesting(mode)
         pendingSOSClip = sosId
-        preGrant.removeAll()
+        gate.request()
         if ptt.isJoined {
             ptt.beginTransmitting() // the system then calls pttDidBeginTransmitting + pttAudioActivated
         } else {
@@ -408,16 +416,8 @@ final class AppModel: ObservableObject {
         if ptt.isJoined { ptt.stopTransmitting() }
         talk = .idle
         grantedTx = nil
-        preGrant.removeAll()
+        gate.reset()
         level = 0
-    }
-
-    private func outgoing(_ packets: [Data]) {
-        switch talk {
-        case .talking: relay?.sendAudio(packets)
-        case .requesting: if preGrant.count < 20 { preGrant.append(packets) } // up to ~1.2 s pre-roll
-        case .idle: break
-        }
     }
 
     // MARK: history
@@ -564,6 +564,7 @@ extension AppModel: PTTControllerDelegate {
             // Lock-screen / Dynamic Island talk button.
             guard let ch = selectedChannel else { return }
             talk = .requesting(.hold)
+            gate.request()
             relay?.connect()
             relay?.requestFloor(channel: ch.id, mode: .hold)
         }
@@ -575,6 +576,7 @@ extension AppModel: PTTControllerDelegate {
             audio.stopCapture()
             talk = .idle
             grantedTx = nil
+            gate.reset()
             talkTimer?.invalidate()
             level = 0
         }
@@ -606,5 +608,35 @@ extension AppModel: PTTControllerDelegate {
         } else {
             relay?.connect()
         }
+    }
+}
+
+/// Thread-safe hand-off between the audio thread and the relay: holds up to
+/// ~1.2 s of pre-roll until the server grants the floor, then streams.
+final class TxGate {
+    weak var relay: Relay?
+    private let lock = NSLock()
+    private var state = 0 // 0 idle, 1 requesting, 2 granted
+    private var pre: [[Data]] = []
+
+    func request() { lock.lock(); state = 1; pre.removeAll(); lock.unlock() }
+    func reset() { lock.lock(); state = 0; pre.removeAll(); lock.unlock() }
+
+    func grant() {
+        lock.lock()
+        for b in pre { relay?.sendAudio(b) }
+        pre.removeAll()
+        state = 2
+        lock.unlock()
+    }
+
+    func push(_ packets: [Data]) {
+        lock.lock()
+        switch state {
+        case 2: relay?.sendAudio(packets)
+        case 1: if pre.count < 20 { pre.append(packets) }
+        default: break
+        }
+        lock.unlock()
     }
 }

@@ -58,7 +58,7 @@ Invite codes: 10 characters (Crockford base32), one use, expire after 24 hours. 
 | `GET /join?c=CODE` | anyone | | HTML page with open/install help |
 | `POST /v1/join` | anyone (rate limited) | `{code, name, platform: "ios"\|"android"}` | `{token, user}` |
 | `GET /v1/me` | any token | | `{user, settings, server}` |
-| `PUT /v1/me` | any token | `{name}` | `{user}` |
+| `PUT /v1/me` | any token | `{name?, phone?}` (phone: digits, optional leading +) | `{user}` |
 | `PUT /v1/me/push` | any token | `{apnsPtt?, apnsAlert?, fcm?, apnsSandbox?}` | `{ok}` |
 | `GET /v1/users` | active | | `{users}` (admin also sees pending) |
 | `POST /v1/users/{id}/approve` | admin | | `{user}` |
@@ -123,7 +123,9 @@ Authenticated with the bearer header. Only `active` users may connect. Text mess
 
 ## Push
 
-Sent only to members who are **not connected** to the WebSocket at that moment.
+- iPhone talk pushes go only to members **not connected** to the WebSocket at that moment.
+- Android talk pushes go to **every** Android member except the talker, because Doze can freeze a socket that still looks connected. The app ignores the push when it is already playing, and reconnects (getting a replay) when nothing has arrived after 2 seconds.
+- SOS pushes go to every recipient who hasn't acknowledged, connected or not.
 
 | Event | iPhone | Android (FCM data message, high priority) |
 | --- | --- | --- |

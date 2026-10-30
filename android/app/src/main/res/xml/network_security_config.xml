@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- HTTPS only. For testing against a server on your own Wi-Fi, add a
+     <domain-config cleartextTrafficPermitted="true"> for its address. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false" />
+</network-security-config>

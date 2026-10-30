@@ -1,0 +1,1 @@
+Vendored from https://github.com/lostromb/concentus (Java port of libopus 1.1.2), commit: 3885c4e46513ef0fc81fca100189e54f1714c6ca 2025-09-27
