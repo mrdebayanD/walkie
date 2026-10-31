@@ -614,6 +614,12 @@ extension AppModel: PTTControllerDelegate {
         if onDuty && phase == .ready { onDuty = false } // left from the system UI
     }
 
+    func pttJoinFailed(_ message: String) {
+        // Stay on duty with the server (you still hear people while Hollo is
+        // open); only the lock-screen button is missing. Retry on next change.
+        print("Push to Talk unavailable: \(message)")
+    }
+
     func pttDidBeginTransmitting(fromSystemUI: Bool) {
         if fromSystemUI && talk == .idle {
             // Lock-screen / Dynamic Island talk button.
