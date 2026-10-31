@@ -11,7 +11,7 @@ on:
   workflow_dispatch:
 jobs:
   upload:
-    runs-on: macos-15
+    runs-on: macos-26
     env:
       HAVE_SECRETS: ${{ secrets.ASC_KEY_P8 != '' && secrets.APPLE_TEAM_ID != '' }}
     steps:

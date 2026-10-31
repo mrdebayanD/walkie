@@ -7,7 +7,7 @@ jobs:
   build:
     # Compiles the app without signing, to catch build errors before you open
     # Xcode. Installing on a phone still needs signing (Xcode or TestFlight).
-    runs-on: macos-15
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@v5
       - name: Generate Xcode project
