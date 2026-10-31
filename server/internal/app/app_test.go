@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"sync"
 	"testing"
@@ -647,5 +648,24 @@ func TestAdminSetsMemberPhone(t *testing.T) {
 	e.do("GET", "/v1/me", ma.Token, nil, &me)
 	if me.User.Phone != "+919876500000" {
 		t.Fatalf("phone not saved: %q", me.User.Phone)
+	}
+}
+
+func TestInvitePageOffersInstallers(t *testing.T) {
+	e := newEnv(t)
+	apk := t.TempDir() + "/walkie.apk"
+	if err := os.WriteFile(apk, []byte("PK-fake-apk"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	e.srv.cfg.AndroidAPK = apk
+	e.srv.cfg.TestFlightURL = "https://testflight.apple.com/join/ABCD1234"
+	var page []byte
+	e.do("GET", "/join?c=ABCDE12345", "", nil, &page)
+	if !bytes.Contains(page, []byte("/install/walkie.apk")) || !bytes.Contains(page, []byte("testflight.apple.com/join/ABCD1234")) {
+		t.Fatalf("install links missing:\n%s", page)
+	}
+	var body []byte
+	if st := e.do("GET", "/install/walkie.apk", "", nil, &body); st != 200 || string(body) != "PK-fake-apk" {
+		t.Fatalf("apk download %d %q", st, body)
 	}
 }

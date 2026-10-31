@@ -20,6 +20,20 @@ The release build is signed with Android Studio's debug key so it installs anywh
 
 The first build may show a few compile errors (the code was written without the Android SDK); paste them back to Claude.
 
+## Easiest: download the ready-made APK
+
+Every change builds automatically: **github.com/mrdebayanD/walkie › Releases › android-latest › walkie.apk** (you need to be logged in to GitHub, since the repo is private).
+
+To let family install it **from their invite link** without GitHub, put the APK on the server:
+
+```bash
+scp walkie.apk ubuntu@SERVER_IP:~/
+ssh ubuntu@SERVER_IP 'sudo install -o root -g walkie -m 0644 walkie.apk /etc/walkie/walkie.apk'
+# in /etc/walkie/walkie.env:  WALKIE_ANDROID_APK=/etc/walkie/walkie.apk   then: sudo systemctl restart walkie
+```
+
+The invite page then shows **Android: download Walkie** above the **Open in Walkie** button.
+
 ## 2. Install on a family phone
 
 1. Send `app-release.apk` by WhatsApp, Google Drive or a USB cable.

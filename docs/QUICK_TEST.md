@@ -14,7 +14,8 @@ cloudflared tunnel --url http://localhost:8080
 Cloudflared prints an address like `https://random-words.trycloudflare.com`. Leave it running, open a second Terminal tab:
 
 ```bash
-WALKIE_PUBLIC_URL=https://random-words.trycloudflare.com WALKIE_DATA=./walkie-data ./walkie-darwin-arm64 serve
+WALKIE_PUBLIC_URL=https://random-words.trycloudflare.com WALKIE_DATA=./walkie-data \
+WALKIE_ANDROID_APK=./walkie.apk ./walkie-darwin-arm64 serve
 ```
 
 It prints your admin invite link. Check `https://random-words.trycloudflare.com/healthz` in a browser says `ok`.
@@ -22,7 +23,7 @@ It prints your admin invite link. Check `https://random-words.trycloudflare.com/
 ## 2. Install the apps
 
 - **iPhone**: open `ios/` in Xcode as in docs/IOS_SETUP.md and Run on your phone. Open the admin link on the phone, Open in Walkie, Join.
-- **Android**: install the APK from the GitHub Actions "Android" run (or build it, docs/ANDROID_SETUP.md). Invite it from your iPhone: Family › Family channel › Add people.
+- **Android**: put `walkie.apk` next to the server (as above) and invite the phone from your iPhone (Family › Family › Add people). The invite page on the Android phone has a **Download Walkie** button, then **Open in Walkie**.
 
 ## Limits of this setup
 

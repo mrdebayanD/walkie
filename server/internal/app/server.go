@@ -18,6 +18,10 @@ type Config struct {
 	DataDir   string
 	PublicURL string // https://walkie.example.org — used in invite links
 
+	// Optional install links shown on the invite page.
+	AndroidAPK    string // path to walkie.apk on the server, served at /install/walkie.apk
+	TestFlightURL string // public TestFlight link, e.g. https://testflight.apple.com/join/XXXX
+
 	APNs *APNsConfig // nil = no iPhone push
 	FCM  *FCMConfig  // nil = no Android push
 }
@@ -92,6 +96,7 @@ func (s *Server) routes() {
 	m := s.mux
 	m.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) { io.WriteString(w, "ok") })
 	m.HandleFunc("GET /join", s.handleJoinPage)
+	m.HandleFunc("GET /install/walkie.apk", s.handleAPK)
 
 	m.HandleFunc("POST /v1/join", s.handleJoin)
 	m.HandleFunc("GET /v1/me", s.auth(false, false, s.handleMe))

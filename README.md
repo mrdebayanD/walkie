@@ -44,7 +44,7 @@ A private push-to-talk walkie-talkie for the family. iPhone and Android, over mo
 ## Status
 
 - Server: built and covered by automated tests (`cd server && go test -race ./...`).
-- iPhone and Android apps: complete source, **not yet compiled** — they were written without access to Xcode or the Android SDK. Expect a few compile fixes on first build; see [docs/TESTING.md](docs/TESTING.md).
+- iPhone and Android apps: both **compile** on GitHub Actions (iOS on macOS/Xcode, Android with the Android SDK). Not yet tested on real phones; see [docs/TESTING.md](docs/TESTING.md).
 
 ## Automatic builds (GitHub Actions)
 
@@ -53,5 +53,6 @@ Push this repo to GitHub and every change builds automatically (Actions tab → 
 | Workflow | Produces |
 | --- | --- |
 | Server | tests + `walkie-linux-arm64`, `walkie-linux-amd64`, `walkie-darwin-arm64` |
-| Android | `app-release.apk`, ready to install (add the `GOOGLE_SERVICES_JSON` secret for push) |
-| iOS | an unsigned compile check + build log (installing on a phone still goes through Xcode or TestFlight) |
+| Android | `walkie.apk` on the **android-latest** release (add the `GOOGLE_SERVICES_JSON` secret for push) |
+| iOS | an unsigned compile check on every change |
+| TestFlight | signs and uploads the iPhone app to TestFlight (needs the four secrets in docs/IOS_SETUP.md) |

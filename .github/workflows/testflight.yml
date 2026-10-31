@@ -1,0 +1,72 @@
+name: TestFlight
+# Builds, signs and uploads the iPhone app to TestFlight on every change to
+# ios/ on main (or when run by hand from the Actions tab).
+#
+# One-time setup (see docs/IOS_SETUP.md, "Automatic TestFlight uploads"):
+# repository secrets APPLE_TEAM_ID, ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_P8.
+on:
+  push:
+    branches: [main]
+    paths: ["ios/**", ".github/workflows/testflight.yml"]
+  workflow_dispatch:
+jobs:
+  upload:
+    runs-on: macos-15
+    env:
+      HAVE_SECRETS: ${{ secrets.ASC_KEY_P8 != '' && secrets.APPLE_TEAM_ID != '' }}
+    steps:
+      - name: Check setup
+        if: env.HAVE_SECRETS != 'true'
+        run: echo "::notice::TestFlight secrets not set yet; skipping. See docs/IOS_SETUP.md."
+      - uses: actions/checkout@v5
+        if: env.HAVE_SECRETS == 'true'
+      - name: Generate Xcode project
+        if: env.HAVE_SECRETS == 'true'
+        working-directory: ios
+        run: |
+          brew install xcodegen
+          xcodegen
+      - name: Archive and upload
+        if: env.HAVE_SECRETS == 'true'
+        working-directory: ios
+        env:
+          TEAM: ${{ secrets.APPLE_TEAM_ID }}
+          KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ISSUER: ${{ secrets.ASC_ISSUER_ID }}
+          KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+          BUILD: ${{ github.run_number }}
+        run: |
+          mkdir -p ~/private_keys
+          KEY="$HOME/private_keys/AuthKey_${KEY_ID}.p8"
+          printf '%s\n' "$KEY_P8" > "$KEY"
+          AUTH=(-allowProvisioningUpdates -authenticationKeyPath "$KEY" -authenticationKeyID "$KEY_ID" -authenticationKeyIssuerID "$ISSUER")
+
+          cat > ExportOptions.plist <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>destination</key><string>upload</string>
+            <key>teamID</key><string>${TEAM}</string>
+            <key>signingStyle</key><string>automatic</string>
+            <key>uploadSymbols</key><true/>
+          </dict></plist>
+          EOF
+
+          xcodebuild -version
+          xcodebuild archive -project Walkie.xcodeproj -scheme Walkie -configuration Release \
+            -destination 'generic/platform=iOS' -archivePath build/Walkie.xcarchive \
+            DEVELOPMENT_TEAM="$TEAM" CODE_SIGN_STYLE=Automatic CURRENT_PROJECT_VERSION="$BUILD" \
+            "${AUTH[@]}" > archive.log 2>&1 \
+          && xcodebuild -exportArchive -archivePath build/Walkie.xcarchive \
+            -exportOptionsPlist ExportOptions.plist -exportPath build/export \
+            "${AUTH[@]}" > export.log 2>&1 \
+          || {
+            for f in archive.log export.log; do
+              [ -f "$f" ] || continue
+              echo "::error::$f:%0A$(grep -E 'error|Error|No profiles|provisioning|entitlement|ERROR' "$f" | sort -u | head -60 | awk '{printf "%s%%0A", $0}')"
+              echo "::warning::$f tail:%0A$(tail -25 "$f" | awk '{printf "%s%%0A", $0}')"
+            done
+            exit 1
+          }
+          echo "::notice::Uploaded build $BUILD to TestFlight. It appears in App Store Connect after Apple finishes processing (usually 5-30 minutes)."

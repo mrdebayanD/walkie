@@ -14,6 +14,8 @@
 //	WALKIE_APNS_BUNDLE_ID  the iPhone app's bundle ID
 //	WALKIE_APNS_CRITICAL   1 if Apple granted the Critical Alerts entitlement
 //	WALKIE_FCM_SERVICE_ACCOUNT  Firebase service-account JSON (optional)
+//	WALKIE_ANDROID_APK     path to walkie.apk, offered on invite pages (optional)
+//	WALKIE_TESTFLIGHT_URL  public TestFlight link, offered on invite pages (optional)
 package main
 
 import (
@@ -37,9 +39,11 @@ func env(k, def string) string {
 
 func config() app.Config {
 	cfg := app.Config{
-		Addr:      env("WALKIE_ADDR", "127.0.0.1:8080"),
-		DataDir:   env("WALKIE_DATA", "./data"),
-		PublicURL: strings.TrimRight(env("WALKIE_PUBLIC_URL", "http://localhost:8080"), "/"),
+		Addr:          env("WALKIE_ADDR", "127.0.0.1:8080"),
+		DataDir:       env("WALKIE_DATA", "./data"),
+		PublicURL:     strings.TrimRight(env("WALKIE_PUBLIC_URL", "http://localhost:8080"), "/"),
+		AndroidAPK:    env("WALKIE_ANDROID_APK", ""),
+		TestFlightURL: env("WALKIE_TESTFLIGHT_URL", ""),
 	}
 	if f := env("WALKIE_APNS_KEY_FILE", ""); f != "" {
 		cfg.APNs = &app.APNsConfig{

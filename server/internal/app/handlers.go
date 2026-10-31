@@ -6,6 +6,7 @@ import (
 	"html/template"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -193,12 +194,20 @@ main{max-width:420px;padding:32px 24px}
 h1{font-size:30px;margin:0 0 8px}
 p{color:rgba(235,235,245,.7);line-height:1.45}
 a.btn{display:block;text-align:center;background:#30D158;color:#00210B;text-decoration:none;font-weight:700;font-size:18px;padding:16px;border-radius:28px;margin:24px 0}
+a.alt{background:#2C2C2E;color:#fff;font-size:16px;margin:12px 0}
+.small{font-size:14px}
 code{font-size:22px;letter-spacing:2px;background:#1C1C1E;padding:8px 12px;border-radius:10px;display:inline-block}
 </style></head><body><main>
 <h1>Join Walkie</h1>
 <p>You have been invited to a private family walkie-talkie.</p>
+<p><b>1. Install the app</b> (skip if you have it):</p>
+{{if .APK}}<a class="btn alt" href="/install/walkie.apk">Android: download Walkie</a>{{end}}
+{{if .TestFlight}}<a class="btn alt" href="{{.TestFlight}}">iPhone: get Walkie on TestFlight</a>{{end}}
+{{if not (or .APK .TestFlight)}}<p>Ask the person who invited you for the iPhone (TestFlight) or Android install link.</p>{{end}}
+{{if .APK}}<p class="small">Android: open the downloaded file and allow "Install unknown apps" when asked.</p>{{end}}
+{{if .TestFlight}}<p class="small">iPhone: install TestFlight from the App Store first if it asks.</p>{{end}}
+<p><b>2. Then come back here and tap:</b></p>
 <a class="btn" href="{{.AppURL}}">Open in Walkie</a>
-<p>Don't have the app yet? Ask the person who invited you for the iPhone (TestFlight) or Android install link, install it, then come back and tap the button.</p>
 <p>Or open the app and type this code:</p>
 <p><code>{{.Code}}</code></p>
 <p>Server: {{.Server}}</p>
@@ -217,7 +226,30 @@ func (s *Server) handleJoinPage(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	// template.URL marks our own walkie:// link as safe (html/template would
 	// otherwise replace a non-http scheme with "#ZgotmplZ").
-	_ = joinPage.Execute(w, map[string]any{"AppURL": template.URL(s.appURL(code)), "Code": code, "Server": s.cfg.PublicURL})
+	_ = joinPage.Execute(w, map[string]any{
+		"AppURL": template.URL(s.appURL(code)), "Code": code, "Server": s.cfg.PublicURL,
+		"APK": s.apkAvailable(), "TestFlight": s.cfg.TestFlightURL,
+	})
+}
+
+func (s *Server) apkAvailable() bool {
+	if s.cfg.AndroidAPK == "" {
+		return false
+	}
+	st, err := os.Stat(s.cfg.AndroidAPK)
+	return err == nil && !st.IsDir()
+}
+
+// handleAPK serves the Android installer so family can install from the invite page.
+func (s *Server) handleAPK(w http.ResponseWriter, r *http.Request) {
+	if !s.apkAvailable() {
+		http.NotFound(w, r)
+		return
+	}
+	w.Header().Set("Content-Type", "application/vnd.android.package-archive")
+	w.Header().Set("Content-Disposition", `attachment; filename="walkie.apk"`)
+	w.Header().Set("Cache-Control", "no-cache")
+	http.ServeFile(w, r, s.cfg.AndroidAPK)
 }
 
 // ---- me ----
