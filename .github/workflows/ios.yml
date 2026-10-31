@@ -1,0 +1,32 @@
+name: iOS
+on:
+  push:
+    paths: ["ios/**", ".github/workflows/ios.yml"]
+  workflow_dispatch:
+jobs:
+  build:
+    # Compiles the app without signing, to catch build errors before you open
+    # Xcode. Installing on a phone still needs signing (Xcode or TestFlight).
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Generate Xcode project
+        working-directory: ios
+        run: |
+          brew install xcodegen
+          xcodegen
+      - name: Build (unsigned)
+        working-directory: ios
+        run: |
+          xcodebuild -version
+          set -o pipefail
+          xcodebuild build -project Walkie.xcodeproj -scheme Walkie \
+            -destination 'generic/platform=iOS' -configuration Debug \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO DEVELOPMENT_TEAM="" \
+            | tee build.log | grep -E "error:|warning: .*deprecated|BUILD (SUCCEEDED|FAILED)" || true
+          grep -q "BUILD SUCCEEDED" build.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ios-build-log
+          path: ios/build.log

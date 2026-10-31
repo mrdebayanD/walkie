@@ -1,0 +1,26 @@
+name: Server
+on:
+  push:
+    paths: ["server/**", ".github/workflows/server.yml"]
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: server/go.mod
+      - name: Test
+        working-directory: server
+        run: go test -race ./...
+      - name: Build binaries
+        working-directory: server
+        run: |
+          for t in linux/arm64 linux/amd64 darwin/arm64; do
+            GOOS=${t%/*} GOARCH=${t#*/} CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o dist/walkie-${t%/*}-${t#*/} ./cmd/walkie
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: walkie-server
+          path: server/dist/
