@@ -8,10 +8,7 @@ struct RootView: View {
             Color.black.ignoresSafeArea()
             switch model.phase {
             case .loading:
-                VStack(spacing: 16) {
-                    ProgressView().tint(.white)
-                    Text(model.errorMessage ?? "Connecting…").font(.subheadline).foregroundStyle(Theme.secondary)
-                }
+                LoadingView()
             case .needsJoin:
                 JoinView()
             case .pending:
@@ -143,6 +140,36 @@ struct JoinView: View {
         .scrollDismissesKeyboard(.interactively)
         .onAppear { if let l = inbox.link { link = l; focus = .name } }
         .onChange(of: inbox.link) { l in if let l { link = l; focus = .name } }
+    }
+}
+
+/// Startup screen. If the server can't be reached (e.g. its address changed),
+/// offers a way out: join again with a new invite. Opening a new invite link
+/// here does the same.
+struct LoadingView: View {
+    @EnvironmentObject var model: AppModel
+    @ObservedObject private var inbox = JoinLinkInbox.shared
+    @State private var confirm = false
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Spacer()
+            ProgressView().tint(.white)
+            Text(model.errorMessage ?? "Connecting…").font(.subheadline).foregroundStyle(Theme.secondary)
+            Spacer()
+            if model.errorMessage != nil {
+                Text("If the server's address changed, join again with a new invite from the admin.")
+                    .font(.footnote).multilineTextAlignment(.center).foregroundStyle(Theme.secondary)
+                Button("Join with a new invite", role: .destructive) { confirm = true }
+                    .padding(.bottom, 24)
+            }
+        }
+        .padding(.horizontal, 32)
+        .confirmationDialog("Leave this family on this phone and join again with a new invite?", isPresented: $confirm, titleVisibility: .visible) {
+            Button("Join with a new invite", role: .destructive) { model.signOut() }
+        }
+        .onChange(of: inbox.link) { l in if l != nil { model.signOut() } }
+        .onAppear { if inbox.link != nil, model.errorMessage != nil { model.signOut() } }
     }
 }
 

@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
@@ -32,15 +33,19 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.debayandatta.walkie.core.Phase
 import com.debayandatta.walkie.core.Walkie
@@ -86,9 +91,27 @@ fun App(joinLink: String?, onAskPermissions: () -> Unit) {
     val st by Walkie.state.collectAsStateWithLifecycle()
     Box(Modifier.fillMaxSize().background(W.bg)) {
         when (st.phase) {
-            Phase.LOADING -> Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
-                CircularProgressIndicator(color = W.primary)
-                Text(st.error ?: "Connecting…", color = W.textMuted, modifier = Modifier.padding(top = 16.dp))
+            Phase.LOADING -> {
+                // A new invite link opened while the old server is unreachable: switch to it.
+                LaunchedEffect(joinLink, st.error) { if (joinLink != null && st.error != null) Walkie.signOut() }
+                Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
+                    CircularProgressIndicator(color = W.primary)
+                    Text(st.error ?: "Connecting…", color = W.textMuted, modifier = Modifier.padding(top = 16.dp))
+                }
+                if (st.error != null) {
+                    var confirm by remember { mutableStateOf(false) }
+                    Column(Modifier.align(Alignment.BottomCenter).padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("If the server's address changed, join again with a new invite from the admin.", color = W.textMuted, fontSize = 13.sp, textAlign = TextAlign.Center)
+                        TextButton(onClick = { confirm = true }) { Text("Join with a new invite", color = W.error) }
+                    }
+                    if (confirm) AlertDialog(
+                        onDismissRequest = { confirm = false },
+                        title = { Text("Join with a new invite?") },
+                        text = { Text("This phone leaves the family and asks for a new invite link.") },
+                        confirmButton = { TextButton(onClick = { confirm = false; Walkie.signOut() }) { Text("Join again", color = W.error) } },
+                        dismissButton = { TextButton(onClick = { confirm = false }) { Text("Cancel") } },
+                    )
+                }
             }
             Phase.NEEDS_JOIN -> JoinScreen(joinLink)
             Phase.PENDING -> PendingScreen()
