@@ -155,6 +155,20 @@ final class AppModel: ObservableObject {
         }
         serverURL = url
         api = API(baseURL: url, token: token)
+        // Joined before: open straight away from the saved copy and reconnect in
+        // the background, so a server that's down never blocks the app.
+        if let cachedMe = LocalCache.load(Member.self, "me"), !cachedMe.isPending {
+            me = cachedMe
+            settings = LocalCache.load(Settings.self, "settings") ?? settings
+            channels = LocalCache.load([Channel].self, "channels") ?? []
+            clips = LocalCache.load([String: [Clip]].self, "clips") ?? [:]
+            let saved = UserDefaults.standard.string(forKey: "selectedChannel")
+            selectedChannelId = channels.first { $0.id == saved }?.id ?? channels.first?.id
+            phase = .ready
+            await becameReady()
+            await refreshMe()
+            return
+        }
         await refreshMe()
     }
 
@@ -164,6 +178,8 @@ final class AppModel: ObservableObject {
             let r = try await api.me()
             me = r.user
             settings = r.settings
+            LocalCache.save(r.user, "me")
+            LocalCache.save(r.settings, "settings")
             if r.user.isPending {
                 phase = .pending
                 startPendingPoll()
@@ -201,9 +217,7 @@ final class AppModel: ObservableObject {
 
     private func becameReady() async {
         guard let url = serverURL, let token = api?.token else { return }
-        await loadChannels()
-        await loadSOS()
-        if isAdmin { await loadPending() }
+        // Connect first: if the server is down, the loads below wait for timeouts.
         let r = Relay(serverURL: url, token: token)
         r.duty = onDuty
         r.onEvent = { [weak self] e in self?.handle(e) }
@@ -211,6 +225,9 @@ final class AppModel: ObservableObject {
         gate.relay = r
         r.connect()
         if onDuty, let ch = selectedChannel { ptt.join(channelId: ch.id, name: title(ch)) }
+        await loadChannels()
+        await loadSOS()
+        if isAdmin { await loadPending() }
         await registerNotifications()
     }
 
@@ -260,6 +277,7 @@ final class AppModel: ObservableObject {
         ptt.leave()
         Keychain.set(nil, for: "token")
         Keychain.set(nil, for: "server")
+        LocalCache.clear()
         api = nil
         me = nil
         channels = []
@@ -272,6 +290,7 @@ final class AppModel: ObservableObject {
         guard let api else { return }
         if let cs = try? await api.channels() {
             channels = cs
+            LocalCache.save(cs, "channels")
             if selectedChannelId == nil || !cs.contains(where: { $0.id == selectedChannelId }) {
                 selectedChannelId = (UserDefaults.standard.string(forKey: "selectedChannel")).flatMap { id in cs.first { $0.id == id }?.id } ?? cs.first?.id
             }
@@ -287,6 +306,7 @@ final class AppModel: ObservableObject {
         guard let api else { return }
         if let cs = try? await api.clips(channel: channelId) {
             clips[channelId] = cs
+            LocalCache.save(clips, "clips")
             if let first = cs.first(where: { $0.mode != "sos" }) {
                 lastMessage = (first.userName, first.startedAt, first.id, first.durationMs)
             }
@@ -699,5 +719,19 @@ final class TxGate {
         default: break
         }
         lock.unlock()
+    }
+}
+
+/// Last good copies of server data, so the app opens even when the server
+/// can't be reached. Cleared when leaving the family.
+enum LocalCache {
+    static func save<T: Encodable>(_ value: T, _ key: String) {
+        if let d = try? JSONEncoder().encode(value) { UserDefaults.standard.set(d, forKey: "cache." + key) }
+    }
+    static func load<T: Decodable>(_ type: T.Type, _ key: String) -> T? {
+        UserDefaults.standard.data(forKey: "cache." + key).flatMap { try? JSONDecoder().decode(type, from: $0) }
+    }
+    static func clear() {
+        for k in ["me", "settings", "channels", "clips"] { UserDefaults.standard.removeObject(forKey: "cache." + k) }
     }
 }

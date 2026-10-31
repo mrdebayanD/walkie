@@ -25,6 +25,8 @@ import com.debayandatta.walkie.net.RelayEvent
 import com.debayandatta.walkie.net.Settings
 import com.debayandatta.walkie.net.SosEvent
 import com.debayandatta.walkie.net.TalkMode
+import com.debayandatta.walkie.net.parseChannels
+import com.debayandatta.walkie.net.parseMe
 import com.debayandatta.walkie.service.DutyService
 import com.google.firebase.messaging.FirebaseMessaging
 import kotlinx.coroutines.CoroutineScope
@@ -153,6 +155,17 @@ object Walkie {
         }
         api = Api(server, token)
         _state.update { it.copy(server = server) }
+        // Joined before: open straight away from the saved copy and reconnect in
+        // the background, so a server that's down never blocks the app.
+        val cachedMe = prefs.cacheMe?.let { runCatching { parseMe(it) }.getOrNull() }
+        if (cachedMe != null && !cachedMe.first.isPending) {
+            val cs = prefs.cacheChannels?.let { runCatching { parseChannels(it) }.getOrNull() } ?: emptyList()
+            val sel = prefs.selectedChannel?.takeIf { id -> cs.any { it.id == id } } ?: cs.firstOrNull()?.id
+            _state.update { it.copy(me = cachedMe.first, settings = cachedMe.second, channels = cs, selectedChannelId = sel, phase = Phase.READY) }
+            becameReady()
+            refreshMeQuietly()
+            return
+        }
         refreshMe()
     }
 
@@ -161,7 +174,9 @@ object Walkie {
     suspend fun refreshMe() {
         val api = api ?: return
         try {
-            val (me, settings) = api.me()
+            val raw = api.meRaw()
+            val (me, settings) = parseMe(raw)
+            prefs.cacheMe = raw
             _state.update { it.copy(me = me, settings = settings, error = null) }
             if (me.isPending) {
                 _state.update { it.copy(phase = Phase.PENDING) }
@@ -181,6 +196,7 @@ object Walkie {
     }
 
     private fun retryMe(msg: String?) {
+        if (s.phase == Phase.READY) return // the relay reconnects by itself; the app stays usable
         setError(msg)
         scope.launch { delay(5000); refreshMe() }
     }
@@ -199,15 +215,16 @@ object Walkie {
     private suspend fun becameReady() {
         val server = prefs.server ?: return
         val token = prefs.token ?: return
-        loadChannels()
-        loadSos()
-        if (s.isAdmin) loadPending()
+        // Connect first: if the server is down, loading below waits for timeouts.
         val r = Relay(server, token)
         r.duty = s.onDuty
         r.onEvent = { handle(it) }
         r.onAudio = { tx, packets -> if (s.remote?.txId == tx) audio.play(packets) }
         relay = r
         updateConnection()
+        loadChannels()
+        loadSos()
+        if (s.isAdmin) loadPending()
         registerPush()
         if (wakeAfterStart) { wakeAfterStart = false; wakeForTalk() }
     }
@@ -366,7 +383,9 @@ object Walkie {
 
     suspend fun loadChannels() {
         val api = api ?: return
-        val cs = runCatching { api.channels() }.getOrNull() ?: return
+        val raw = runCatching { api.channelsRaw() }.getOrNull() ?: return
+        val cs = runCatching { parseChannels(raw) }.getOrNull() ?: return
+        prefs.cacheChannels = raw
         _state.update { st ->
             val sel = st.selectedChannelId?.takeIf { id -> cs.any { it.id == id } }
                 ?: prefs.selectedChannel?.takeIf { id -> cs.any { it.id == id } }
@@ -456,7 +475,12 @@ object Walkie {
 
     private suspend fun refreshMeQuietly() {
         val api = api ?: return
-        try { api.me() } catch (e: ApiException) { if (e.status == 401) signOut() } catch (_: Exception) {}
+        try {
+            val raw = api.meRaw()
+            val (me, settings) = parseMe(raw)
+            prefs.cacheMe = raw
+            _state.update { it.copy(me = me, settings = settings) }
+        } catch (e: ApiException) { if (e.status == 401) signOut() } catch (_: Exception) {}
     }
 
     private fun remoteEnded() {

@@ -49,10 +49,10 @@ class Api(val baseUrl: String, var token: String?) {
         return o.getString("token") to Member.from(o.getJSONObject("user"))
     }
 
-    suspend fun me(): Pair<Member, Settings> {
-        val o = json("GET", "v1/me")
-        return Member.from(o.getJSONObject("user")) to Settings.from(o.optJSONObject("settings"))
-    }
+    suspend fun me(): Pair<Member, Settings> = parseMe(meRaw())
+    /** Raw JSON, so the app can keep a copy and open offline. */
+    suspend fun meRaw(): String = String(call("GET", "v1/me"))
+    suspend fun channelsRaw(): String = String(call("GET", "v1/channels"))
 
     suspend fun updateMe(name: String?, phone: String?): Member {
         val b = JSONObject()
@@ -63,7 +63,7 @@ class Api(val baseUrl: String, var token: String?) {
 
     suspend fun setFcmToken(token: String) { call("PUT", "v1/me/push", JSONObject().put("fcm", token)) }
 
-    suspend fun channels(): List<Channel> = json("GET", "v1/channels").optJSONArray("channels").objects().map(Channel::from)
+    suspend fun channels(): List<Channel> = parseChannels(channelsRaw())
     suspend fun users(): List<Member> = json("GET", "v1/users").optJSONArray("users").objects().map(Member::from)
     suspend fun approve(id: String) { call("POST", "v1/users/$id/approve") }
 
@@ -123,3 +123,10 @@ class Api(val baseUrl: String, var token: String?) {
         call("POST", "v1/sos/$id/resolve", JSONObject().put("resolution", if (falseAlarm) "false_alarm" else "safe"))
     }
 }
+
+fun parseMe(raw: String): Pair<Member, Settings> {
+    val o = JSONObject(raw)
+    return Member.from(o.getJSONObject("user")) to Settings.from(o.optJSONObject("settings"))
+}
+
+fun parseChannels(raw: String): List<Channel> = JSONObject(raw).optJSONArray("channels").objects().map(Channel::from)

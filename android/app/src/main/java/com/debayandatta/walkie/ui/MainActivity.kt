@@ -15,6 +15,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -144,12 +145,21 @@ private fun MainTabs() {
             }
         },
     ) { pad ->
-        Box(Modifier.padding(pad).statusBarsPadding()) {
-            when (tab) {
-                0 -> TalkScreen()
-                1 -> HistoryScreen()
-                2 -> FamilyScreen()
-                3 -> SafetyScreen()
+        // Offline bar: shown only if the server stays unreachable for a few seconds.
+        var offline by remember { mutableStateOf(false) }
+        LaunchedEffect(st.connected) { offline = false; if (!st.connected) { delay(4000); offline = true } }
+        Column(Modifier.padding(pad).statusBarsPadding()) {
+            if (offline && !st.connected) {
+                Text("Offline · can't reach the server. Retrying…", color = W.text, fontSize = 13.sp, textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth().background(W.surfaceHigh).padding(vertical = 8.dp, horizontal = 16.dp))
+            }
+            Box(Modifier.weight(1f)) {
+                when (tab) {
+                    0 -> TalkScreen()
+                    1 -> HistoryScreen()
+                    2 -> FamilyScreen()
+                    3 -> SafetyScreen()
+                }
             }
         }
     }

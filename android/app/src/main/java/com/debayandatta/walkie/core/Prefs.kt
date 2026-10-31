@@ -35,5 +35,14 @@ class Prefs(context: Context) {
         get() = p.getString("fcmToken", null)
         set(v) = p.edit().putString("fcmToken", v).apply()
 
-    fun clearSession() = p.edit().remove("server").remove("token").remove("selectedChannel").apply()
+    /** Last good copies from the server, so the app opens even when it's unreachable. */
+    var cacheMe: String?
+        get() = p.getString("cache.me", null)
+        set(v) = p.edit().putString("cache.me", v).apply()
+    var cacheChannels: String?
+        get() = p.getString("cache.channels", null)
+        set(v) = p.edit().putString("cache.channels", v).apply()
+
+    fun clearSession() = p.edit().remove("server").remove("token").remove("selectedChannel")
+        .remove("cache.me").remove("cache.channels").apply()
 }

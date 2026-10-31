@@ -38,7 +38,37 @@ struct MainTabs: View {
             SafetyView()
                 .tabItem { Label("Safety", systemImage: "shield.fill") }.tag(3)
         }
-        .overlay(alignment: .top) { ErrorToast() }
+        .overlay(alignment: .top) {
+            VStack(spacing: 8) {
+                OfflineBar()
+                ErrorToast()
+            }
+        }
+    }
+}
+
+/// Shown when the server stays unreachable for a few seconds. The app keeps
+/// working with what it has (channels, history, Family settings, Leave).
+struct OfflineBar: View {
+    @EnvironmentObject var model: AppModel
+    @State private var show = false
+    var body: some View {
+        Group {
+            if show && !model.connected {
+                Label("Offline · can't reach the server. Retrying…", systemImage: "wifi.slash")
+                    .font(.footnote.weight(.medium))
+                    .padding(.horizontal, 14).padding(.vertical, 8)
+                    .glass(16)
+                    .padding(.top, 4)
+                    .transition(.opacity)
+            }
+        }
+        .task(id: model.connected) {
+            show = false
+            guard !model.connected else { return }
+            try? await Task.sleep(nanoseconds: 4_000_000_000)
+            withAnimation { show = true }
+        }
     }
 }
 
