@@ -5,25 +5,22 @@ struct InviteView: View {
     @EnvironmentObject var model: AppModel
     @Environment(\.dismiss) var dismiss
     @Environment(\.openURL) var openURL
-    @State var channelId: String?
+    /// Invites always belong to one channel; people join that channel when approved.
+    let channel: Channel
     @State private var label = ""
     @State private var invite: InviteResult?
     @State private var phone = ""
     @State private var busy = false
     @State private var open: [PendingInvite] = []
 
-    init(channelId: String?) { _channelId = State(initialValue: channelId) }
-
     var body: some View {
         NavigationStack {
             Form {
                 Section {
-                    Picker("Channel", selection: $channelId) {
-                        ForEach(model.channels) { Text($0.name).tag(Optional($0.id)) }
-                    }
-                    .onChange(of: channelId) { _ in invite = nil }
                     TextField("Who is it for? (e.g. Pishi)", text: $label)
                         .onChange(of: label) { _ in invite = nil }
+                } footer: {
+                    Text("They'll join \(channel.name) once you approve them.")
                 }
 
                 if let invite {
@@ -58,16 +55,16 @@ struct InviteView: View {
                         } label: {
                             HStack { if busy { ProgressView() }; Text("Create invite") }.frame(maxWidth: .infinity)
                         }
-                        .disabled(busy || channelId == nil)
+                        .disabled(busy)
                     }
                 }
 
                 if !open.isEmpty {
-                    Section("Open invites") {
+                    Section("Open invites to \(channel.name)") {
                         ForEach(open) { i in
                             VStack(alignment: .leading) {
                                 Text(i.label.isEmpty ? "Unnamed invite" : i.label)
-                                Text("\(model.channels.first { $0.id == i.channelId }?.name ?? "") · expires \(i.expiresAt, style: .relative)")
+                                Text("Expires in \(i.expiresAt, style: .relative)")
                                     .font(.footnote).foregroundStyle(Theme.secondary)
                             }
                             .swipeActions {
@@ -77,7 +74,7 @@ struct InviteView: View {
                     }
                 }
             }
-            .navigationTitle("Add People")
+            .navigationTitle("Add People to \(channel.name)")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
             .task { await loadOpen() }
@@ -85,17 +82,17 @@ struct InviteView: View {
     }
 
     private func create() async {
-        guard let channelId, let api = model.api else { return }
+        guard let api = model.api else { return }
         busy = true
         defer { busy = false }
         do {
-            invite = try await api.createInvite(channelId: channelId, label: label)
+            invite = try await api.createInvite(channelId: channel.id, label: label)
             await loadOpen()
         } catch { model.errorMessage = error.localizedDescription }
     }
 
     private func loadOpen() async {
-        open = (try? await model.api?.invites()) ?? []
+        open = ((try? await model.api?.invites()) ?? []).filter { $0.channelId == channel.id }
     }
 
     private func sendSMS(_ invite: InviteResult) {

@@ -41,6 +41,15 @@ final class AppModel: ObservableObject {
     // Data
     @Published var channels: [Channel] = []
     @Published var selectedChannelId: String? { didSet { channelSelectionChanged(oldValue) } }
+    @Published var selectedTab = 0
+    /// The group channel to return to after talking to one person.
+    @Published var returnChannelId: String?
+    var returnChannel: Channel? { channels.first { $0.id == returnChannelId } ?? defaultChannel }
+
+    func backToGroup() {
+        selectedChannelId = returnChannel?.id
+        returnChannelId = nil
+    }
     @Published var settings = Settings(clipTtlHours: 24)
     @Published var clips: [String: [Clip]] = [:]
     @Published var playedClips: Set<String> = []
@@ -98,6 +107,42 @@ final class AppModel: ObservableObject {
     var isAdmin: Bool { me?.isAdmin == true }
     var selectedChannel: Channel? { channels.first { $0.id == selectedChannelId } ?? channels.first }
     var defaultChannel: Channel? { channels.first { $0.isDefault } }
+    var groupChannels: [Channel] { channels.filter { !$0.isPersonal } }
+    var personalChannels: [Channel] { channels.filter { $0.isPersonal }.sorted { title($0) < title($1) } }
+    func title(_ c: Channel) -> String { c.title(me: me?.id) }
+
+    /// Everyone you share a channel with, plus you.
+    var everyone: [Member] {
+        var seen = Set<String>(), out: [Member] = []
+        for c in channels { for m in c.members where !seen.contains(m.id) { seen.insert(m.id); out.append(m) } }
+        return out.sorted { $0.name < $1.name }
+    }
+
+    func unheard(in channelId: String) -> Int {
+        (clips[channelId] ?? []).filter { !playedClips.contains($0.id) && $0.userId != me?.id }.count
+    }
+
+    func loadAllClips() async {
+        for c in channels { await loadClips(c.id) }
+    }
+
+    /// Opens the personal channel with someone and switches to the Talk tab.
+    func talkPrivately(with m: Member) async {
+        guard let api else { return }
+        do {
+            let c = try await api.personalChannel(with: m.id)
+            if selectedChannel?.isPersonal != true { returnChannelId = selectedChannel?.id }
+            await loadChannels()
+            selectedChannelId = c.id
+            selectedTab = 0
+        } catch { errorMessage = error.localizedDescription }
+    }
+
+    func deletePersonal(_ c: Channel) async {
+        try? await api?.deleteChannel(c.id)
+        if selectedChannelId == c.id { selectedChannelId = defaultChannel?.id }
+        await loadChannels()
+    }
 
     // MARK: launch
 
@@ -165,13 +210,13 @@ final class AppModel: ObservableObject {
         relay = r
         gate.relay = r
         r.connect()
-        if onDuty, let ch = selectedChannel { ptt.join(channelId: ch.id, name: ch.name) }
+        if onDuty, let ch = selectedChannel { ptt.join(channelId: ch.id, name: title(ch)) }
         await registerNotifications()
     }
 
     /// Accepts a full invite link (https://…/join?c=CODE or walkie://join?s=…&c=…)
     /// or a server address plus a code typed by hand.
-    func join(link: String, code: String?, name: String) async {
+    func join(link: String, code: String?, name: String, phone: String = "") async {
         errorMessage = nil
         guard let (server, c) = AppModel.parseInvite(link: link, code: code) else {
             errorMessage = "That doesn't look like an invite link. Paste the whole link, or the server address and code."
@@ -179,7 +224,7 @@ final class AppModel: ObservableObject {
         }
         let api = API(baseURL: server, token: nil)
         do {
-            let r = try await api.join(code: c, name: name)
+            let r = try await api.join(code: c, name: name, phone: phone)
             Keychain.set(server.absoluteString, for: "server")
             Keychain.set(r.token, for: "token")
             serverURL = server
@@ -261,13 +306,13 @@ final class AppModel: ObservableObject {
     private func channelSelectionChanged(_ old: String?) {
         guard selectedChannelId != old, let ch = selectedChannel else { return }
         UserDefaults.standard.set(ch.id, forKey: "selectedChannel")
-        if onDuty { ptt.join(channelId: ch.id, name: ch.name) }
+        if onDuty { ptt.join(channelId: ch.id, name: title(ch)) }
         Task { await loadClips(ch.id) }
     }
 
     private func dutyChanged() {
         relay?.setDuty(onDuty)
-        if onDuty, let ch = selectedChannel { ptt.join(channelId: ch.id, name: ch.name) } else { ptt.leave() }
+        if onDuty, let ch = selectedChannel { ptt.join(channelId: ch.id, name: title(ch)) } else { ptt.leave() }
     }
 
     // MARK: relay events
@@ -310,28 +355,31 @@ final class AppModel: ObservableObject {
             errorMessage = reason == "busy" ? "\(remote?.name ?? "Someone") is talking. Wait for them to finish." : "You can't talk on this channel."
         case .floorTaken(let ch, let tx, let uid, let name, _):
             guard uid != me?.id else { return }
+            // Already hearing someone on another channel: this one goes to History (unheard).
+            guard remote == nil else { return }
             remote = RemoteTalk(channel: ch, txId: tx, userId: uid, name: name, since: Date())
             heldRemote.removeAll()
             if speakerMuted { Haptics.incoming() }
+            let chan = channels.first { $0.id == ch }
+            let label = chan?.isPersonal == true ? "\(name) (personal)" : (chan.map { "\(name) · \(title($0))" } ?? name)
             if ptt.isJoined {
-                ptt.setRemoteSpeaker(name)
+                ptt.setRemoteSpeaker(label)
             } else {
                 AudioEngine.activateForPlayback()
                 sessionActive = true
                 audio.sessionActivated()
             }
         case .floorEnded(let ch, let tx, let uid, let clipId, let reason):
+            let heardLive = remote?.txId == tx
             if uid == me?.id {
                 if grantedTx == tx { stopLocalTalk() }
                 if reason == "timeout" { Haptics.stop() }
-            } else if remote?.txId == tx {
+            } else if heardLive {
                 remoteEnded()
             }
             Task { await loadClips(ch) }
-            if let clipId, uid != me?.id {
-                // Heard live = played (when the speaker isn't muted and we were on duty).
-                if !speakerMuted && onDuty { markPlayed(clipId) }
-            }
+            // Heard live = played (only if it actually played out loud).
+            if let clipId, uid != me?.id, heardLive, !speakerMuted { markPlayed(clipId) }
         case .audio(let tx, let packets):
             guard remote?.txId == tx else { return }
             if sessionActive { audio.play(packets: packets) } else { heldRemote.append(contentsOf: packets) }

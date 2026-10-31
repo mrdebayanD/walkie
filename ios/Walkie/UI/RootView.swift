@@ -30,16 +30,16 @@ struct MainTabs: View {
     @EnvironmentObject var model: AppModel
 
     var body: some View {
-        TabView {
+        TabView(selection: $model.selectedTab) {
             TalkView()
-                .tabItem { Label("Talk", systemImage: "mic.fill") }
+                .tabItem { Label("Talk", systemImage: "mic.fill") }.tag(0)
             HistoryView()
-                .tabItem { Label("History", systemImage: "clock.arrow.circlepath") }
+                .tabItem { Label("History", systemImage: "clock.arrow.circlepath") }.tag(1)
             FamilyView()
                 .tabItem { Label("Family", systemImage: "person.2.fill") }
-                .badge(model.pendingUsers.count)
+                .badge(model.pendingUsers.count).tag(2)
             SafetyView()
-                .tabItem { Label("Safety", systemImage: "shield.fill") }
+                .tabItem { Label("Safety", systemImage: "shield.fill") }.tag(3)
         }
         .overlay(alignment: .top) { ErrorToast() }
     }
@@ -73,9 +73,10 @@ struct JoinView: View {
     @State private var link = ""
     @State private var code = ""
     @State private var name = ""
+    @State private var phone = ""
     @State private var busy = false
     @FocusState private var focus: Field?
-    enum Field { case link, code, name }
+    enum Field { case link, code, name, phone }
 
     var body: some View {
         ScrollView {
@@ -111,6 +112,14 @@ struct JoinView: View {
                     Text("This is how the family sees you.").font(.footnote).foregroundStyle(Theme.secondary).padding(.leading, 16)
                 }
 
+                VStack(alignment: .leading, spacing: 8) {
+                    SectionHeader(text: "Your phone number")
+                    TextField("+91 98765 43210", text: $phone)
+                        .keyboardType(.phonePad).textContentType(.telephoneNumber).focused($focus, equals: .phone)
+                        .padding(14).background(Theme.card2, in: RoundedRectangle(cornerRadius: 14))
+                    Text("So your family can call you if you send an SOS.").font(.footnote).foregroundStyle(Theme.secondary).padding(.leading, 16)
+                }
+
                 if let e = model.errorMessage {
                     Text(e).font(.subheadline).foregroundStyle(Theme.redText)
                 }
@@ -118,7 +127,7 @@ struct JoinView: View {
                 Button {
                     busy = true
                     Task {
-                        await model.join(link: link, code: code, name: name)
+                        await model.join(link: link, code: code, name: name, phone: phone)
                         busy = false
                     }
                 } label: {

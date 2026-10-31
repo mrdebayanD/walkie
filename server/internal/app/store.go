@@ -54,10 +54,13 @@ type User struct {
 }
 
 type Channel struct {
-	ID        string    `json:"id"`
-	Name      string    `json:"name"`
-	Color     string    `json:"color"`
-	IsDefault bool      `json:"isDefault"`
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	Color     string `json:"color"`
+	IsDefault bool   `json:"isDefault"`
+	// Kind is "group" (admin-managed) or "direct" (a private channel between
+	// exactly two people; the admin can't see, change or replay it).
+	Kind      string    `json:"kind,omitempty"`
 	Members   []string  `json:"members"`
 	CreatedAt time.Time `json:"createdAt"`
 }
@@ -274,11 +277,40 @@ func sortChannels(cs []*Channel) {
 	})
 }
 
-func (s *state) removeUserEverywhere(userID string) {
-	for _, c := range s.Channels {
+// removeUserEverywhere drops the user from every channel and deletes their
+// personal channels. It returns the ids of clips whose files must be removed.
+func (s *state) removeUserEverywhere(userID string) (deadClips []string) {
+	for id, c := range s.Channels {
+		if c.IsDirect() && contains(c.Members, userID) {
+			delete(s.Channels, id)
+			for cid, cl := range s.Clips {
+				if cl.ChannelID == id {
+					delete(s.Clips, cid)
+					deadClips = append(deadClips, cid)
+				}
+			}
+			continue
+		}
 		c.Members = remove(c.Members, userID)
 	}
 	delete(s.Users, userID)
+	return deadClips
+}
+
+func (c *Channel) IsDirect() bool { return c.Kind == "direct" }
+
+// canSee: members always; the admin also sees group channels (never direct ones).
+func (c *Channel) canSee(u User) bool {
+	return contains(c.Members, u.ID) || (u.Role == RoleAdmin && !c.IsDirect())
+}
+
+func (s *state) directBetween(a, b string) *Channel {
+	for _, c := range s.Channels {
+		if c.IsDirect() && len(c.Members) == 2 && contains(c.Members, a) && contains(c.Members, b) {
+			return c
+		}
+	}
+	return nil
 }
 
 func (s *state) takeTxID() uint32 {

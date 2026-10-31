@@ -29,6 +29,7 @@ type ChannelView struct {
 	Name      string     `json:"name"`
 	Color     string     `json:"color"`
 	IsDefault bool       `json:"isDefault"`
+	Kind      string     `json:"kind"`
 	Members   []UserView `json:"members"`
 }
 
@@ -46,7 +47,11 @@ func (s *Server) userView(u *User) UserView {
 }
 
 func (s *Server) channelView(st *state, c *Channel) ChannelView {
-	cv := ChannelView{ID: c.ID, Name: c.Name, Color: c.Color, IsDefault: c.IsDefault, Members: []UserView{}}
+	kind := c.Kind
+	if kind == "" {
+		kind = "group"
+	}
+	cv := ChannelView{ID: c.ID, Name: c.Name, Color: c.Color, IsDefault: c.IsDefault, Kind: kind, Members: []UserView{}}
 	for _, id := range c.Members {
 		if u := st.Users[id]; u != nil {
 			cv.Members = append(cv.Members, s.userView(u))
@@ -104,6 +109,7 @@ func (s *Server) handleJoin(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Code     string `json:"code"`
 		Name     string `json:"name"`
+		Phone    string `json:"phone"`
 		Platform string `json:"platform"`
 	}
 	if err := readJSON(r, &req); err != nil {
@@ -113,6 +119,11 @@ func (s *Server) handleJoin(w http.ResponseWriter, r *http.Request) {
 	name, err := cleanName(req.Name, 40)
 	if err != nil {
 		writeErr(w, http.StatusBadRequest, "bad_name", err.Error())
+		return
+	}
+	phone, err := cleanPhone(req.Phone)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, "bad_phone", err.Error())
 		return
 	}
 	if req.Platform != "ios" && req.Platform != "android" {
@@ -136,7 +147,7 @@ func (s *Server) handleJoin(w http.ResponseWriter, r *http.Request) {
 		}
 		u := &User{
 			ID: newID(), Name: name, Role: RoleMember, Status: StatusPending,
-			Platform: req.Platform, CreatedAt: time.Now().UTC(), TokenHash: hashSecret(token),
+			Platform: req.Platform, Phone: phone, CreatedAt: time.Now().UTC(), TokenHash: hashSecret(token),
 			InviteChan: inv.ChannelID, InviteLabel: inv.Label,
 		}
 		if inv.Admin {
@@ -358,7 +369,9 @@ func (s *Server) handleDeleteUser(w http.ResponseWriter, r *http.Request, u User
 		if st.Users[id] == nil {
 			return ErrNotFound
 		}
-		st.removeUserEverywhere(id)
+		for _, cid := range st.removeUserEverywhere(id) {
+			s.clips.Delete(cid)
+		}
 		return nil
 	})
 	if err != nil {
@@ -376,14 +389,12 @@ func (s *Server) handleChannels(w http.ResponseWriter, r *http.Request, u User) 
 	out := []ChannelView{}
 	s.store.View(func(st *state) {
 		var cs []*Channel
-		if u.Role == RoleAdmin {
-			for _, c := range st.Channels {
+		for _, c := range st.Channels {
+			if c.canSee(u) {
 				cs = append(cs, c)
 			}
-			sortChannels(cs)
-		} else {
-			cs = st.channelsOf(u.ID)
 		}
+		sortChannels(cs)
 		for _, c := range cs {
 			out = append(out, s.channelView(st, c))
 		}
@@ -411,10 +422,16 @@ func (s *Server) handleCreateChannel(w http.ResponseWriter, r *http.Request, u U
 	}
 	var cv ChannelView
 	err = s.store.Update(func(st *state) error {
-		if len(st.Channels) >= 20 {
+		groups := 0
+		for _, c := range st.Channels {
+			if !c.IsDirect() {
+				groups++
+			}
+		}
+		if groups >= 20 {
 			return errors.New("too many channels")
 		}
-		c := &Channel{ID: newID(), Name: name, Color: req.Color, Members: []string{u.ID}, CreatedAt: time.Now().UTC()}
+		c := &Channel{ID: newID(), Name: name, Color: req.Color, Kind: "group", Members: []string{u.ID}, CreatedAt: time.Now().UTC()}
 		for _, id := range req.MemberIDs {
 			if x := st.Users[id]; x != nil && x.Status == StatusActive {
 				c.Members = addUnique(c.Members, id)
@@ -445,7 +462,7 @@ func (s *Server) handleUpdateChannel(w http.ResponseWriter, r *http.Request, u U
 	var vErr error
 	err := s.store.Update(func(st *state) error {
 		c := st.Channels[r.PathValue("id")]
-		if c == nil {
+		if c == nil || c.IsDirect() {
 			return ErrNotFound
 		}
 		if req.Name != nil {
@@ -485,7 +502,7 @@ func (s *Server) handleSetMembers(w http.ResponseWriter, r *http.Request, u User
 	var cv ChannelView
 	err := s.store.Update(func(st *state) error {
 		c := st.Channels[r.PathValue("id")]
-		if c == nil {
+		if c == nil || c.IsDirect() {
 			return ErrNotFound
 		}
 		members := []string{}
@@ -510,11 +527,15 @@ func (s *Server) handleSetMembers(w http.ResponseWriter, r *http.Request, u User
 
 func (s *Server) handleDeleteChannel(w http.ResponseWriter, r *http.Request, u User) {
 	id := r.PathValue("id")
-	var isDefault bool
+	var isDefault, forbidden bool
 	err := s.store.Update(func(st *state) error {
 		c := st.Channels[id]
-		if c == nil {
+		if c == nil || !c.canSee(u) {
 			return ErrNotFound
+		}
+		if !c.IsDirect() && u.Role != RoleAdmin {
+			forbidden = true
+			return errors.New("forbidden")
 		}
 		if c.IsDefault {
 			isDefault = true
@@ -533,6 +554,10 @@ func (s *Server) handleDeleteChannel(w http.ResponseWriter, r *http.Request, u U
 		writeErr(w, http.StatusBadRequest, "default_channel", "The Family channel can't be deleted")
 		return
 	}
+	if forbidden {
+		writeErr(w, http.StatusForbidden, "forbidden", "Only the admin can do this")
+		return
+	}
 	if err != nil {
 		writeErr(w, http.StatusNotFound, "not_found", "Channel not found")
 		return
@@ -544,6 +569,94 @@ func (s *Server) handleDeleteChannel(w http.ResponseWriter, r *http.Request, u U
 
 func (s *Server) broadcastChannelsChanged() {
 	s.hub.Broadcast(map[string]any{"t": "channels_changed"})
+}
+
+// handleDirect opens (or returns) the personal channel between the caller
+// and another active member. Only those two can hear, see or replay it.
+func (s *Server) handleDirect(w http.ResponseWriter, r *http.Request, u User) {
+	var req struct {
+		UserID string `json:"userId"`
+	}
+	if err := readJSON(r, &req); err != nil || req.UserID == "" {
+		writeErr(w, http.StatusBadRequest, "bad_request", "Invalid request")
+		return
+	}
+	if req.UserID == u.ID {
+		writeErr(w, http.StatusBadRequest, "self", "You can't open a personal channel with yourself")
+		return
+	}
+	var cv ChannelView
+	created := false
+	err := s.store.Update(func(st *state) error {
+		other := st.Users[req.UserID]
+		if other == nil || other.Status != StatusActive {
+			return ErrNotFound
+		}
+		c := st.directBetween(u.ID, other.ID)
+		if c == nil {
+			c = &Channel{ID: newID(), Name: "", Color: "purple", Kind: "direct", Members: []string{u.ID, other.ID}, CreatedAt: time.Now().UTC()}
+			st.Channels[c.ID] = c
+			created = true
+		}
+		cv = s.channelView(st, c)
+		return nil
+	})
+	if err != nil {
+		writeErr(w, http.StatusNotFound, "not_found", "That person isn't in the family")
+		return
+	}
+	if created {
+		s.hub.SendTo([]string{u.ID, req.UserID}, map[string]any{"t": "channels_changed"})
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"channel": cv})
+}
+
+// handleUpdateUser lets the admin fix a member's name or phone number
+// (useful for parents who won't type it themselves).
+func (s *Server) handleUpdateUser(w http.ResponseWriter, r *http.Request, u User) {
+	var req struct {
+		Name  *string `json:"name"`
+		Phone *string `json:"phone"`
+	}
+	if err := readJSON(r, &req); err != nil {
+		writeErr(w, http.StatusBadRequest, "bad_request", "Invalid request")
+		return
+	}
+	var name, phone string
+	var err error
+	if req.Name != nil {
+		if name, err = cleanName(*req.Name, 40); err != nil {
+			writeErr(w, http.StatusBadRequest, "bad_name", err.Error())
+			return
+		}
+	}
+	if req.Phone != nil {
+		if phone, err = cleanPhone(*req.Phone); err != nil {
+			writeErr(w, http.StatusBadRequest, "bad_phone", err.Error())
+			return
+		}
+	}
+	var out User
+	err = s.store.Update(func(st *state) error {
+		x := st.Users[r.PathValue("id")]
+		if x == nil {
+			return ErrNotFound
+		}
+		if req.Name != nil {
+			x.Name = name
+		}
+		if req.Phone != nil {
+			x.Phone = phone
+		}
+		out = *x
+		return nil
+	})
+	if err != nil {
+		writeErr(w, http.StatusNotFound, "not_found", "User not found")
+		return
+	}
+	s.broadcastChannelsChanged()
+	writeJSON(w, http.StatusOK, map[string]any{"user": s.userView(&out)})
 }
 
 // ---- invites ----
@@ -566,7 +679,7 @@ func (s *Server) handleCreateInvite(w http.ResponseWriter, r *http.Request, u Us
 	var iv InviteView
 	err := s.store.Update(func(st *state) error {
 		ch := st.Channels[req.ChannelID]
-		if ch == nil {
+		if ch == nil || ch.IsDirect() {
 			ch = st.defaultChannel()
 		}
 		active := 0

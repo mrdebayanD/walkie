@@ -7,6 +7,7 @@ struct TalkView: View {
         let ch = model.selectedChannel
         VStack(spacing: 0) {
             header(ch)
+            if let ch, ch.isPersonal { privateBar(ch) }
             VStack(alignment: .leading, spacing: 2) {
                 Text(titleText).font(.largeTitle.bold())
                     .contentTransition(.opacity)
@@ -34,11 +35,15 @@ struct TalkView: View {
     private var titleText: String {
         if case .talking = model.talk { return "You're talking" }
         if let r = model.remote { return "\(r.name) is talking" }
-        return model.selectedChannel?.name ?? "Walkie"
+        return model.selectedChannel.map(model.title) ?? "Walkie"
     }
 
     private func subtitle(_ ch: Channel?) -> String {
         guard let ch else { return "" }
+        if ch.isPersonal, !model.talk.isActive {
+            let other = ch.other(me: model.me?.id)
+            return "Personal · only you and \(other?.name ?? "them") · \(other?.duty == true ? "on duty" : "off duty")"
+        }
         let others = ch.members.filter { $0.id != model.me?.id }
         if case .talking = model.talk {
             let n = others.filter(\.duty).count
@@ -53,19 +58,30 @@ struct TalkView: View {
         HStack {
             Menu {
                 Picker("Channel", selection: $model.selectedChannelId) {
-                    ForEach(model.channels) { c in Text(c.name).tag(Optional(c.id)) }
+                    ForEach(model.groupChannels) { c in Text(c.name).tag(Optional(c.id)) }
+                }
+                if !model.personalChannels.isEmpty {
+                    Section("Personal") {
+                        Picker("Personal", selection: $model.selectedChannelId) {
+                            ForEach(model.personalChannels) { c in Label(model.title(c), systemImage: "lock.fill").tag(Optional(c.id)) }
+                        }
+                    }
+                }
+                Section {
+                    Button { model.selectedTab = 2 } label: { Label("Talk privately with…", systemImage: "lock") }
                 }
             } label: {
                 HStack(spacing: 6) {
                     Circle().fill(model.connected ? Theme.green : Theme.orange).frame(width: 8, height: 8)
-                    Text(ch?.name ?? "Channel").font(.subheadline.weight(.semibold))
+                    if ch?.isPersonal == true { Image(systemName: "lock.fill").font(.caption2) }
+                    Text(ch.map(model.title) ?? "Channel").font(.subheadline.weight(.semibold))
                     Image(systemName: "chevron.down").font(.caption2.weight(.bold))
                 }
                 .foregroundStyle(.white)
                 .padding(.horizontal, 16).frame(height: 44)
                 .glass(22)
             }
-            .accessibilityLabel("Channel: \(ch?.name ?? "none"). Change channel")
+            .accessibilityLabel("Channel: \(ch.map(model.title) ?? "none"). Change channel")
             Spacer()
             Button { model.speakerMuted.toggle(); Haptics.tick() } label: {
                 Image(systemName: model.speakerMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
@@ -78,22 +94,57 @@ struct TalkView: View {
         }
     }
 
+    /// "Only Ma hears you" with a way back to the group channel.
+    private func privateBar(_ ch: Channel) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: "lock.fill").foregroundStyle(Theme.green)
+            Text("Only \(model.title(ch)) hears you").font(.subheadline.weight(.semibold))
+            Spacer()
+            Button {
+                model.backToGroup()
+            } label: {
+                Text("Back to \(model.returnChannel.map(model.title) ?? "Family")").font(.subheadline.weight(.semibold))
+            }
+            .foregroundStyle(Theme.green)
+            .frame(minHeight: 44)
+        }
+        .padding(.horizontal, 14)
+        .glass(18)
+        .padding(.top, 12)
+    }
+
+    /// Tap someone to talk to them only; tap yourself does nothing.
     private func members(_ ch: Channel?) -> some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 10) {
                 ForEach(ch?.members ?? []) { m in
                     let speaking = model.remote?.userId == m.id || (m.id == model.me?.id && model.talk != .idle)
-                    VStack(spacing: 6) {
-                        Avatar(member: m, size: 48, showStatus: true)
-                            .overlay(Circle().strokeBorder(speaking ? Theme.green : .clear, lineWidth: 2.5).padding(-4))
-                        Text(m.id == model.me?.id ? "You" : m.name)
-                            .font(.caption).foregroundStyle(Theme.secondary).lineLimit(1)
+                    let isMe = m.id == model.me?.id
+                    Button {
+                        guard !isMe, ch?.isPersonal != true else { return }
+                        Haptics.tick()
+                        Task { await model.talkPrivately(with: m) }
+                    } label: {
+                        VStack(spacing: 6) {
+                            Avatar(member: m, size: 48, showStatus: true)
+                                .overlay(Circle().strokeBorder(speaking ? Theme.green : .clear, lineWidth: 2.5).padding(-4))
+                            Text(isMe ? "You" : m.name)
+                                .font(.caption).foregroundStyle(Theme.secondary).lineLimit(1)
+                        }
+                        .frame(width: 56)
                     }
-                    .frame(width: 56)
+                    .buttonStyle(.plain)
+                    .disabled(isMe || ch?.isPersonal == true || model.talk.isActive)
+                    .accessibilityHint(isMe || ch?.isPersonal == true ? "" : "Talk to \(m.name) only")
                 }
             }
         }
         .padding(.top, 20)
+        .overlay(alignment: .bottomLeading) {
+            if ch?.isPersonal != true && (ch?.members.count ?? 0) > 2 {
+                Text("Tap someone to talk to them only").font(.caption2).foregroundStyle(Theme.secondary).offset(y: 18)
+            }
+        }
     }
 
     @ViewBuilder private var center: some View {

@@ -101,12 +101,14 @@ func (s *Server) routes() {
 	m.HandleFunc("GET /v1/users", s.auth(true, false, s.handleUsers))
 	m.HandleFunc("POST /v1/users/{id}/approve", s.auth(true, true, s.handleApprove))
 	m.HandleFunc("DELETE /v1/users/{id}", s.auth(true, true, s.handleDeleteUser))
+	m.HandleFunc("PUT /v1/users/{id}", s.auth(true, true, s.handleUpdateUser))
 
 	m.HandleFunc("GET /v1/channels", s.auth(true, false, s.handleChannels))
 	m.HandleFunc("POST /v1/channels", s.auth(true, true, s.handleCreateChannel))
 	m.HandleFunc("PATCH /v1/channels/{id}", s.auth(true, true, s.handleUpdateChannel))
 	m.HandleFunc("PUT /v1/channels/{id}/members", s.auth(true, true, s.handleSetMembers))
-	m.HandleFunc("DELETE /v1/channels/{id}", s.auth(true, true, s.handleDeleteChannel))
+	m.HandleFunc("DELETE /v1/channels/{id}", s.auth(true, false, s.handleDeleteChannel)) // group: admin; personal: either member
+	m.HandleFunc("POST /v1/direct", s.auth(true, false, s.handleDirect))
 	m.HandleFunc("GET /v1/channels/{id}/clips", s.auth(true, false, s.handleClips))
 	m.HandleFunc("GET /v1/clips/{id}/audio", s.auth(true, false, s.handleClipAudio))
 

@@ -1,13 +1,16 @@
 import SwiftUI
 
+/// History is per channel: pick a channel (or personal line) at the top;
+/// each one shows how many messages you haven't heard.
 struct HistoryView: View {
     @EnvironmentObject var model: AppModel
+    @State private var channelId: String?
     @State private var filter = Filter.all
     enum Filter: String, CaseIterable { case all = "All", missed = "Missed", sos = "SOS" }
 
     var body: some View {
         NavigationStack {
-            let ch = model.selectedChannel
+            let ch = model.channels.first { $0.id == channelId } ?? model.selectedChannel
             let all = ch.flatMap { model.clips[$0.id] } ?? []
             let missed = all.filter { !model.playedClips.contains($0.id) && $0.userId != model.me?.id }
             let shown: [Clip] = {
@@ -19,12 +22,21 @@ struct HistoryView: View {
             }()
             List {
                 Section {
+                    channelPicker(selected: ch?.id)
+                        .listRowBackground(Color.clear)
+                        .listRowInsets(EdgeInsets())
                     Picker("Filter", selection: $filter) {
                         ForEach(Filter.allCases, id: \.self) { Text($0.rawValue).tag($0) }
                     }
                     .pickerStyle(.segmented)
                     .listRowBackground(Color.clear)
                     .listRowInsets(EdgeInsets())
+                } footer: {
+                    if let ch, ch.isPersonal {
+                        Label("Only you and \(model.title(ch)) can hear these.", systemImage: "lock.fill").font(.footnote)
+                    } else {
+                        Text("Clips delete themselves after \(model.settings.clipTtlHours) hours").font(.footnote)
+                    }
                 }
                 if shown.isEmpty {
                     Section {
@@ -52,13 +64,38 @@ struct HistoryView: View {
                     }
                 }
             }
-            .safeAreaInset(edge: .top) {
-                Text("Clips delete themselves after \(model.settings.clipTtlHours) hours")
-                    .font(.footnote).foregroundStyle(Theme.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 20)
+            .refreshable { await model.loadAllClips() }
+            .task { await model.loadAllClips() }
+            .onAppear { if channelId == nil { channelId = model.selectedChannelId } }
+        }
+    }
+
+    private func channelPicker(selected: String?) -> some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(model.groupChannels + model.personalChannels) { c in
+                    let on = c.id == selected
+                    let n = model.unheard(in: c.id)
+                    Button { channelId = c.id } label: {
+                        HStack(spacing: 6) {
+                            if c.isPersonal { Image(systemName: "lock.fill").font(.caption2) }
+                            Text(model.title(c)).font(.subheadline.weight(.semibold))
+                            if n > 0 {
+                                Text("\(n)").font(.caption2.weight(.bold)).foregroundStyle(.white)
+                                    .padding(.horizontal, 6).frame(minWidth: 18, minHeight: 18)
+                                    .background(Color.blue, in: Capsule())
+                            }
+                        }
+                        .padding(.horizontal, 14).frame(height: 36)
+                        .foregroundStyle(on ? Theme.onGreen : .white)
+                        .background(on ? AnyShapeStyle(Theme.green) : AnyShapeStyle(Theme.glassFill), in: Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("\(model.title(c))\(c.isPersonal ? ", personal" : "")\(n > 0 ? ", \(n) unheard" : "")")
+                    .accessibilityAddTraits(on ? .isSelected : [])
+                }
             }
-            .refreshable { if let ch { await model.loadClips(ch.id) } }
-            .task(id: ch?.id) { if let ch { await model.loadClips(ch.id) } }
+            .padding(.vertical, 4)
         }
     }
 

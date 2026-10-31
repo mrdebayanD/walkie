@@ -87,8 +87,19 @@ final class API {
     struct SOSListResponse: Decodable { let sos: [SOSEvent] }
     struct InvitesResponse: Decodable { let invites: [PendingInvite] }
 
-    func join(code: String, name: String) async throws -> JoinResponse {
-        try await request("POST", "v1/join", body: ["code": code, "name": name, "platform": "ios"])
+    func join(code: String, name: String, phone: String) async throws -> JoinResponse {
+        try await request("POST", "v1/join", body: ["code": code, "name": name, "phone": phone, "platform": "ios"])
+    }
+    /// Opens (or returns) the personal channel with another member.
+    func personalChannel(with userId: String) async throws -> Channel {
+        try await request("POST", "v1/direct", body: ["userId": userId], as: ChannelResponse.self).channel
+    }
+    /// Admin: fix someone's name or phone number.
+    func updateUser(_ id: String, name: String? = nil, phone: String? = nil) async throws {
+        var b: [String: Any] = [:]
+        if let name { b["name"] = name }
+        if let phone { b["phone"] = phone }
+        try await raw("PUT", "v1/users/\(id)", body: b)
     }
     func me() async throws -> MeResponse { try await request("GET", "v1/me") }
     func updateMe(name: String? = nil, phone: String? = nil) async throws -> Member {

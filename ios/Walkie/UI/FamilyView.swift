@@ -3,8 +3,6 @@ import SwiftUI
 struct FamilyView: View {
     @EnvironmentObject var model: AppModel
     @State private var showNewChannel = false
-    @State private var showInvite = false
-    @State private var editing: Channel?
     @State private var showProfile = false
 
     var body: some View {
@@ -30,50 +28,30 @@ struct FamilyView: View {
                     }
                 }
 
-                Section("Channels") {
-                    ForEach(model.channels) { c in
-                        Button { if model.isAdmin { editing = c } else { model.selectedChannelId = c.id } } label: {
-                            HStack(spacing: 12) {
-                                RoundedRectangle(cornerRadius: 9).fill(Theme.channelColor(c.isDefault ? "green" : c.color))
-                                    .frame(width: 32, height: 32)
-                                    .overlay(Image(systemName: c.isDefault ? "house.fill" : "number").font(.footnote.weight(.bold)).foregroundStyle(c.isDefault ? Theme.onGreen : .white))
-                                VStack(alignment: .leading) {
-                                    Text(c.name).font(.body.weight(.semibold)).foregroundStyle(.white)
-                                    Text(c.isDefault ? "Pinned · \(c.members.count) members" : "\(c.members.count) members")
-                                        .font(.footnote).foregroundStyle(Theme.secondary)
-                                }
-                                Spacer()
-                                if c.isDefault { Text("Default").font(.footnote.weight(.semibold)).foregroundStyle(Theme.green) }
-                                if model.selectedChannelId == c.id { Image(systemName: "checkmark").foregroundStyle(Theme.green) }
-                            }
-                        }
+                Section {
+                    ForEach(model.groupChannels) { c in
+                        NavigationLink(value: c.id) { ChannelRow(channel: c) }
                     }
                     if model.isAdmin {
                         Button { showNewChannel = true } label: { Label("New channel", systemImage: "plus") }
                     }
+                } header: { Text("Channels") } footer: {
+                    if model.isAdmin { Text("Open a channel to add people to it.") }
                 }
 
-                Section("Members") {
-                    ForEach(allMembers) { m in
-                        HStack(spacing: 12) {
-                            Avatar(member: m, size: 36)
-                            VStack(alignment: .leading) {
-                                Text(m.id == model.me?.id ? "\(m.name) (you)" : m.name)
-                                Text("\(m.platform == "ios" ? "iPhone" : "Android")\(m.isAdmin ? " · Admin" : "")")
-                                    .font(.footnote).foregroundStyle(Theme.secondary)
-                            }
-                            Spacer()
-                            HStack(spacing: 6) {
-                                Circle().fill(m.duty ? Theme.green : Theme.secondary).frame(width: 8, height: 8)
-                                Text(m.duty ? "On duty" : (m.online ? "Online" : "Off")).font(.footnote)
-                            }
-                            .foregroundStyle(m.duty ? Theme.green : Theme.secondary)
-                        }
-                        .swipeActions {
-                            if model.isAdmin && m.id != model.me?.id {
-                                Button("Remove", role: .destructive) { Task { try? await model.api?.removeUser(m.id); await model.loadChannels() } }
+                if !model.personalChannels.isEmpty {
+                    Section {
+                        ForEach(model.personalChannels) { c in
+                            Button {
+                                model.selectedChannelId = c.id
+                                model.selectedTab = 0
+                            } label: { ChannelRow(channel: c) }
+                            .swipeActions {
+                                Button("Delete", role: .destructive) { Task { await model.deletePersonal(c) } }
                             }
                         }
+                    } header: { Text("Personal") } footer: {
+                        Text("Only the two of you can hear or replay these. Swipe to delete one and its history.")
                     }
                 }
 
@@ -99,7 +77,9 @@ struct FamilyView: View {
                     } else {
                         LabeledContent("Clips delete after", value: "\(model.settings.clipTtlHours) hours")
                     }
-                    Button("My name and phone number") { showProfile = true }
+                    Button { showProfile = true } label: {
+                        LabeledContent("My name and phone", value: model.me?.phone?.isEmpty == false ? model.me!.phone! : "Add phone")
+                    }
                 }
 
                 Section {
@@ -110,27 +90,112 @@ struct FamilyView: View {
             }
             .listStyle(.insetGrouped)
             .navigationTitle("Family")
-            .toolbar {
-                if model.isAdmin {
-                    ToolbarItem(placement: .navigationBarTrailing) {
-                        Button { showInvite = true } label: { Label("Add people", systemImage: "person.badge.plus").labelStyle(.titleAndIcon) }
-                            .buttonStyle(.borderedProminent).buttonBorderShape(.capsule).foregroundStyle(Theme.onGreen)
+            .navigationDestination(for: String.self) { id in ChannelDetail(channelId: id) }
+            .refreshable { await model.loadChannels(); await model.loadPending() }
+            .sheet(isPresented: $showNewChannel) { ChannelEditor(channel: nil) }
+            .sheet(isPresented: $showProfile) { ProfileView(member: nil) }
+        }
+    }
+}
+
+struct ChannelRow: View {
+    @EnvironmentObject var model: AppModel
+    let channel: Channel
+    var body: some View {
+        let c = channel
+        HStack(spacing: 12) {
+            if c.isPersonal {
+                Avatar(member: c.other(me: model.me?.id), size: 32)
+            } else {
+                RoundedRectangle(cornerRadius: 9).fill(Theme.channelColor(c.isDefault ? "green" : c.color))
+                    .frame(width: 32, height: 32)
+                    .overlay(Image(systemName: c.isDefault ? "house.fill" : "number").font(.footnote.weight(.bold)).foregroundStyle(c.isDefault ? Theme.onGreen : .white))
+            }
+            VStack(alignment: .leading) {
+                HStack(spacing: 4) {
+                    if c.isPersonal { Image(systemName: "lock.fill").font(.caption2).foregroundStyle(Theme.secondary) }
+                    Text(model.title(c)).font(.body.weight(.semibold)).foregroundStyle(.white)
+                }
+                Text(c.isPersonal ? "Personal" : (c.isDefault ? "Pinned · \(c.members.count) members" : "\(c.members.count) members"))
+                    .font(.footnote).foregroundStyle(Theme.secondary)
+            }
+            Spacer()
+            if c.isDefault { Text("Default").font(.footnote.weight(.semibold)).foregroundStyle(Theme.green) }
+            if model.selectedChannelId == c.id { Image(systemName: "checkmark").foregroundStyle(Theme.green) }
+        }
+    }
+}
+
+/// One channel: who's in it, call or talk privately to anyone, and (admin) add people.
+struct ChannelDetail: View {
+    @EnvironmentObject var model: AppModel
+    @Environment(\.openURL) var openURL
+    let channelId: String
+    @State private var showInvite = false
+    @State private var showEdit = false
+    @State private var editingMember: Member?
+
+    var body: some View {
+        if let c = model.channels.first(where: { $0.id == channelId }) {
+            List {
+                Section {
+                    Button {
+                        model.selectedChannelId = c.id
+                        model.selectedTab = 0
+                    } label: { Label("Talk in \(c.name)", systemImage: "mic.fill") }
+                    Button {
+                        model.selectedTab = 1
+                    } label: { Label("History of \(c.name)", systemImage: "clock.arrow.circlepath") }
+                }
+
+                Section("Members · \(c.members.count)") {
+                    ForEach(c.members) { m in
+                        HStack(spacing: 12) {
+                            Avatar(member: m, size: 36, showStatus: true)
+                            VStack(alignment: .leading) {
+                                Text(m.id == model.me?.id ? "\(m.name) (you)" : m.name)
+                                Text([m.platform == "ios" ? "iPhone" : "Android", m.isAdmin ? "Admin" : nil, m.phone].compactMap { $0 }.joined(separator: " · "))
+                                    .font(.footnote).foregroundStyle(Theme.secondary)
+                            }
+                            Spacer()
+                            if m.id != model.me?.id {
+                                if let p = m.phone, !p.isEmpty, let u = URL(string: "tel:\(p)") {
+                                    Button { openURL(u) } label: { Image(systemName: "phone.fill") }
+                                        .buttonStyle(.borderless).foregroundStyle(Theme.green)
+                                        .frame(width: 44, height: 44)
+                                        .accessibilityLabel("Call \(m.name)")
+                                }
+                                Button { Task { await model.talkPrivately(with: m) } } label: { Image(systemName: "lock.fill") }
+                                    .buttonStyle(.borderless).foregroundStyle(.white)
+                                    .frame(width: 44, height: 44)
+                                    .accessibilityLabel("Talk to \(m.name) only")
+                            }
+                        }
+                        .swipeActions {
+                            if model.isAdmin && m.id != model.me?.id {
+                                Button("Remove", role: .destructive) { Task { try? await model.api?.removeUser(m.id); await model.loadChannels() } }
+                                Button("Edit") { editingMember = m }.tint(.gray)
+                            }
+                        }
+                    }
+                    if model.isAdmin {
+                        Button { showInvite = true } label: { Label("Add people to \(c.name)", systemImage: "person.badge.plus") }
                     }
                 }
             }
-            .refreshable { await model.loadChannels(); await model.loadPending() }
-            .sheet(isPresented: $showNewChannel) { ChannelEditor(channel: nil) }
-            .sheet(item: $editing) { ChannelEditor(channel: $0) }
-            .sheet(isPresented: $showInvite) { InviteView(channelId: model.defaultChannel?.id) }
-            .sheet(isPresented: $showProfile) { ProfileView() }
+            .listStyle(.insetGrouped)
+            .navigationTitle(c.name)
+            .toolbar {
+                if model.isAdmin {
+                    ToolbarItem(placement: .navigationBarTrailing) { Button("Edit") { showEdit = true } }
+                }
+            }
+            .sheet(isPresented: $showInvite) { InviteView(channel: c) }
+            .sheet(isPresented: $showEdit) { ChannelEditor(channel: c) }
+            .sheet(item: $editingMember) { ProfileView(member: $0) }
+        } else {
+            Text("This channel was removed.").foregroundStyle(Theme.secondary)
         }
-    }
-
-    private var allMembers: [Member] {
-        var seen = Set<String>()
-        var out: [Member] = []
-        for c in model.channels { for m in c.members where !seen.contains(m.id) { seen.insert(m.id); out.append(m) } }
-        return out.sorted { $0.name < $1.name }
     }
 }
 
@@ -141,7 +206,6 @@ struct ChannelEditor: View {
     @State private var name = ""
     @State private var color = "blue"
     @State private var selected: Set<String> = []
-    @State private var showInvite = false
     @State private var busy = false
     private let colors = ["blue", "green", "orange", "pink", "purple", "teal"]
 
@@ -170,11 +234,9 @@ struct ChannelEditor: View {
                     .frame(maxWidth: .infinity)
                     .listRowBackground(Color.clear)
                 }
-                Section("Name") {
-                    TextField("Channel name", text: $name)
-                }
-                Section("Members · \(selected.count) selected") {
-                    ForEach(people) { m in
+                Section("Name") { TextField("Channel name", text: $name) }
+                Section {
+                    ForEach(model.everyone) { m in
                         Button {
                             if m.id == model.me?.id { return }
                             if selected.contains(m.id) { selected.remove(m.id) } else { selected.insert(m.id) }
@@ -189,14 +251,8 @@ struct ChannelEditor: View {
                         }
                         .accessibilityAddTraits(selected.contains(m.id) ? .isSelected : [])
                     }
-                    Button { showInvite = true } label: { Label("Invite someone new", systemImage: "person.badge.plus") }
-                        .disabled(channel == nil)
-                }
-                Section {
-                    EmptyView()
-                } footer: {
-                    Text(channel == nil ? "Create the channel first, then invite new people to it. Only you can add or remove people. Family stays your default channel."
-                                        : "Only you can add or remove people.")
+                } header: { Text("Members · \(selected.count) selected") } footer: {
+                    Text(channel == nil ? "To bring in someone new, create the channel, open it, and tap Add people." : "To bring in someone new, use Add people on the channel page.")
                 }
                 if let channel, !channel.isDefault {
                     Section {
@@ -206,7 +262,7 @@ struct ChannelEditor: View {
                     }
                 }
             }
-            .navigationTitle(channel == nil ? "New Channel" : channel!.name)
+            .navigationTitle(channel == nil ? "New Channel" : "Edit \(channel!.name)")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
@@ -216,7 +272,6 @@ struct ChannelEditor: View {
                         .disabled(busy || name.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
             }
-            .sheet(isPresented: $showInvite) { InviteView(channelId: channel?.id) }
             .onAppear {
                 if let channel {
                     name = channel.name
@@ -227,12 +282,6 @@ struct ChannelEditor: View {
                 }
             }
         }
-    }
-
-    private var people: [Member] {
-        var seen = Set<String>(), out: [Member] = []
-        for c in model.channels { for m in c.members where !seen.contains(m.id) { seen.insert(m.id); out.append(m) } }
-        return out.sorted { $0.name < $1.name }
     }
 
     private func save() async {
@@ -254,9 +303,11 @@ struct ChannelEditor: View {
     }
 }
 
+/// Edit your own name/phone, or (admin) someone else's.
 struct ProfileView: View {
     @EnvironmentObject var model: AppModel
     @Environment(\.dismiss) var dismiss
+    let member: Member?
     @State private var name = ""
     @State private var phone = ""
 
@@ -267,10 +318,10 @@ struct ProfileView: View {
                 Section {
                     TextField("+91 98765 43210", text: $phone).keyboardType(.phonePad).textContentType(.telephoneNumber)
                 } header: { Text("Phone number") } footer: {
-                    Text("Shown to your family so they can call you from an SOS alert.")
+                    Text("The family can call this number from the member list and from an SOS alert.")
                 }
             }
-            .navigationTitle("You")
+            .navigationTitle(member == nil ? "You" : member!.name)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
@@ -278,7 +329,11 @@ struct ProfileView: View {
                     Button("Save") {
                         Task {
                             do {
-                                model.me = try await model.api?.updateMe(name: name, phone: phone)
+                                if let member {
+                                    try await model.api?.updateUser(member.id, name: name, phone: phone)
+                                } else {
+                                    model.me = try await model.api?.updateMe(name: name, phone: phone)
+                                }
                                 await model.loadChannels()
                                 dismiss()
                             } catch { model.errorMessage = error.localizedDescription }
@@ -286,7 +341,11 @@ struct ProfileView: View {
                     }
                 }
             }
-            .onAppear { name = model.me?.name ?? ""; phone = model.me?.phone ?? "" }
+            .onAppear {
+                let m = member ?? model.me
+                name = m?.name ?? ""
+                phone = m?.phone ?? ""
+            }
         }
     }
 }

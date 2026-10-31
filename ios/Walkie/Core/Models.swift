@@ -22,7 +22,19 @@ struct Channel: Codable, Identifiable, Hashable {
     var name: String
     var color: String
     var isDefault: Bool
+    var kind: String?
     var members: [Member]
+
+    /// A personal channel: exactly two people; nobody else (not even the admin) can hear or replay it.
+    var isPersonal: Bool { kind == "direct" }
+
+    /// Personal channels are named after the other person.
+    func title(me: String?) -> String {
+        guard isPersonal else { return name }
+        return members.first { $0.id != me }?.name ?? "Personal"
+    }
+
+    func other(me: String?) -> Member? { isPersonal ? members.first { $0.id != me } : nil }
 }
 
 struct Settings: Codable, Equatable {

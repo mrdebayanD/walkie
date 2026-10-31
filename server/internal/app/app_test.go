@@ -523,3 +523,129 @@ func TestAndroidAlwaysWokenIOSOnlyWhenOffline(t *testing.T) {
 		t.Fatalf("connected Android member not woken: %v", e.push.sent)
 	}
 }
+
+// joinMember adds another approved member to the family and returns them.
+func (e *env) joinMember(admin joinResp, family, name, platform string) joinResp {
+	e.t.Helper()
+	var inv struct {
+		Code string `json:"code"`
+	}
+	e.do("POST", "/v1/invites", admin.Token, map[string]string{"channelId": family, "label": name}, &inv)
+	var m joinResp
+	if st := e.do("POST", "/v1/join", "", map[string]string{"code": inv.Code, "name": name, "platform": platform, "phone": "+919000000001"}, &m); st != 200 {
+		e.t.Fatalf("join %s: %d", name, st)
+	}
+	if m.User.Phone != "+919000000001" {
+		e.t.Fatalf("phone at join not saved: %+v", m.User)
+	}
+	e.do("POST", "/v1/users/"+m.User.ID+"/approve", admin.Token, nil, nil)
+	return m
+}
+
+func TestPersonalChannelIsPrivate(t *testing.T) {
+	e := newEnv(t)
+	admin, ma, family := e.family("ios")
+	didi := e.joinMember(admin, family, "Didi", "android")
+
+	// Ma opens a personal channel with Didi; asking twice returns the same one.
+	var c1, c2 struct{ Channel ChannelView }
+	if st := e.do("POST", "/v1/direct", ma.Token, map[string]string{"userId": didi.User.ID}, &c1); st != 200 {
+		t.Fatalf("direct %d", st)
+	}
+	e.do("POST", "/v1/direct", didi.Token, map[string]string{"userId": ma.User.ID}, &c2)
+	if c1.Channel.ID != c2.Channel.ID || c1.Channel.Kind != "direct" || len(c1.Channel.Members) != 2 {
+		t.Fatalf("bad personal channel %+v / %+v", c1.Channel, c2.Channel)
+	}
+	pid := c1.Channel.ID
+
+	// The admin doesn't see it, can't change it, can't read its history.
+	var chans struct{ Channels []ChannelView }
+	e.do("GET", "/v1/channels", admin.Token, nil, &chans)
+	for _, c := range chans.Channels {
+		if c.ID == pid {
+			t.Fatal("admin can see a personal channel")
+		}
+	}
+	if st := e.do("GET", "/v1/channels/"+pid+"/clips", admin.Token, nil, nil); st != 404 {
+		t.Fatalf("admin read personal history: %d", st)
+	}
+	if st := e.do("PUT", "/v1/channels/"+pid+"/members", admin.Token, map[string]any{"memberIds": []string{admin.User.ID}}, nil); st != 404 {
+		t.Fatalf("admin changed personal channel: %d", st)
+	}
+	if st := e.do("POST", "/v1/invites", admin.Token, map[string]string{"channelId": pid}, nil); st != 200 {
+		t.Fatalf("invite fallback failed: %d", st)
+	}
+
+	// Ma talks; Didi hears; the admin (connected, on duty) gets nothing.
+	a := e.connect(admin.Token, true)
+	m := e.connect(ma.Token, true)
+	d := e.connect(didi.Token, true)
+	m.sendJSON(map[string]any{"t": "floor_request", "channel": pid, "mode": "hold"})
+	m.expect("floor_granted")
+	d.expect("floor_taken")
+	m.sendAudio([]byte("secret"))
+	if b := d.expectAudio(); !bytes.Contains(b, []byte("secret")) {
+		t.Fatal("Didi didn't hear")
+	}
+	m.sendJSON(map[string]any{"t": "floor_release"})
+	end := d.expect("floor_ended")
+	deadline := time.After(400 * time.Millisecond)
+drain:
+	for {
+		select {
+		case msg := <-a.ch:
+			if mm, ok := msg.(map[string]any); ok && (mm["t"] == "floor_taken" || mm["t"] == "floor_ended") {
+				t.Fatalf("admin received personal traffic: %v", mm)
+			}
+			if _, ok := msg.([]byte); ok {
+				t.Fatal("admin received personal audio")
+			}
+		case <-deadline:
+			break drain
+		}
+	}
+	if st := e.do("GET", "/v1/clips/"+end["clipId"].(string)+"/audio", admin.Token, nil, nil); st != 404 {
+		t.Fatalf("admin replayed personal clip: %d", st)
+	}
+	var clips struct{ Clips []ClipView }
+	e.do("GET", "/v1/channels/"+pid+"/clips", didi.Token, nil, &clips)
+	if len(clips.Clips) != 1 {
+		t.Fatalf("Didi can't see personal history")
+	}
+
+	// Either member can delete it; removing a member deletes theirs.
+	if st := e.do("DELETE", "/v1/channels/"+pid, didi.Token, nil, nil); st != 200 {
+		t.Fatalf("member couldn't delete own personal channel: %d", st)
+	}
+	var again struct{ Channel ChannelView }
+	e.do("POST", "/v1/direct", ma.Token, map[string]string{"userId": admin.User.ID}, &again)
+	if st := e.do("DELETE", "/v1/users/"+ma.User.ID, admin.Token, nil, nil); st != 200 {
+		t.Fatalf("remove %d", st)
+	}
+	e.do("GET", "/v1/channels", admin.Token, nil, &chans)
+	for _, c := range chans.Channels {
+		if c.Kind == "direct" {
+			t.Fatal("personal channel survived its member's removal")
+		}
+	}
+	// Members can't delete group channels.
+	if st := e.do("DELETE", "/v1/channels/"+family, didi.Token, nil, nil); st != 403 {
+		t.Fatalf("member deleted group channel: %d", st)
+	}
+}
+
+func TestAdminSetsMemberPhone(t *testing.T) {
+	e := newEnv(t)
+	admin, ma, _ := e.family("ios")
+	if st := e.do("PUT", "/v1/users/"+ma.User.ID, admin.Token, map[string]string{"phone": "+91 98765 00000"}, nil); st != 200 {
+		t.Fatalf("admin set phone %d", st)
+	}
+	if st := e.do("PUT", "/v1/users/"+admin.User.ID, ma.Token, map[string]string{"phone": "1234567"}, nil); st != 403 {
+		t.Fatalf("member edited someone else: %d", st)
+	}
+	var me struct{ User UserView }
+	e.do("GET", "/v1/me", ma.Token, nil, &me)
+	if me.User.Phone != "+919876500000" {
+		t.Fatalf("phone not saved: %q", me.User.Phone)
+	}
+}

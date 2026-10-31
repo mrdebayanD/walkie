@@ -119,7 +119,7 @@ func (s *Server) handleClips(w http.ResponseWriter, r *http.Request, u User) {
 	allowed := false
 	s.store.View(func(st *state) {
 		c := st.Channels[cid]
-		if c == nil || !(contains(c.Members, u.ID) || u.Role == RoleAdmin) {
+		if c == nil || !c.canSee(u) {
 			return
 		}
 		allowed = true
@@ -161,7 +161,7 @@ func (s *Server) handleClipAudio(w http.ResponseWriter, r *http.Request, u User)
 			return
 		}
 		c := st.Channels[cl.ChannelID]
-		if c != nil && (contains(c.Members, u.ID) || u.Role == RoleAdmin) {
+		if c != nil && c.canSee(u) {
 			allowed = true
 		}
 		if cl.SOSID != "" {

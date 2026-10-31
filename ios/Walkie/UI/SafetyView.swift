@@ -8,6 +8,7 @@ struct SafetyView: View {
     @State private var holding = false
     @State private var holdTask: Task<Void, Never>?
     @State private var showCountdown = false
+    @State private var showProfile = false
     private let holdSeconds = 3.0
 
     var body: some View {
@@ -28,6 +29,20 @@ struct SafetyView: View {
                 }
                 .padding(.top, 8)
 
+                if model.me?.phone?.isEmpty ?? true {
+                    Button { showProfile = true } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(Theme.orange)
+                            Text("Add your phone number so the family can call you during an SOS")
+                                .font(.subheadline).foregroundStyle(.white).multilineTextAlignment(.leading)
+                            Spacer()
+                            Image(systemName: "chevron.right").foregroundStyle(Theme.secondary)
+                        }
+                        .padding(14).background(Theme.orange.opacity(0.15), in: RoundedRectangle(cornerRadius: 22))
+                    }
+                    .padding(.top, 10)
+                }
+
                 Spacer()
                 if let mine = model.mySOS {
                     activeSOS(mine)
@@ -36,6 +51,7 @@ struct SafetyView: View {
                 }
                 Spacer()
 
+                if model.mySOS == nil {
                 VStack(alignment: .leading, spacing: 0) {
                     SectionHeader(text: "When you send SOS").padding(.bottom, 8)
                     VStack(spacing: 0) {
@@ -48,10 +64,12 @@ struct SafetyView: View {
                     .padding(.horizontal, 14).background(Theme.card, in: RoundedRectangle(cornerRadius: 22))
                 }
                 .padding(.bottom, 12)
+                }
             }
             .padding(.horizontal, 20)
             .navigationTitle("Safety")
             .fullScreenCover(isPresented: $showCountdown) { SOSCountdownView() }
+            .sheet(isPresented: $showProfile) { ProfileView(member: nil) }
             .onAppear { Location.shared.requestPermission() }
         }
     }
@@ -134,6 +152,7 @@ struct SafetyView: View {
                 .buttonStyle(.borderedProminent).buttonBorderShape(.capsule).foregroundStyle(Theme.onGreen)
             Button("It was a false alarm") { Task { await model.resolveMySOS(falseAlarm: true) } }
                 .foregroundStyle(Theme.secondary)
+            CallList(title: "Call someone", exclude: model.me?.id, firstIds: s.responders)
         }
     }
 }
@@ -252,7 +271,7 @@ struct SOSAlertView: View {
                         Label("Call \(live.userName)", systemImage: "phone.fill").font(.headline).frame(maxWidth: .infinity, minHeight: 56)
                     }
                     .buttonStyle(.borderedProminent).buttonBorderShape(.capsule).foregroundStyle(Theme.onGreen)
-                    .disabled(sender?.phone == nil)
+                    .disabled(sender?.phone?.isEmpty ?? true)
 
                     if let clipId = live.clipIds.first, let clip = model.clips[live.channelId]?.first(where: { $0.id == clipId }) ?? syntheticClip(live, clipId) {
                         Button { Task { await model.play(clip) } } label: {
@@ -266,6 +285,12 @@ struct SOSAlertView: View {
                     Text("Call 112").font(.headline).foregroundStyle(Theme.redText).frame(maxWidth: .infinity, minHeight: 56)
                         .overlay(Capsule().strokeBorder(Theme.red, lineWidth: 1.5))
                 }
+
+                if sender?.phone?.isEmpty ?? true {
+                    Text("\(live.userName) hasn't saved a phone number. Call someone who may be nearby:")
+                        .font(.footnote).foregroundStyle(Theme.secondary).frame(maxWidth: .infinity, alignment: .leading)
+                }
+                CallList(title: "Call family", exclude: model.me?.id, skip: live.userId, firstIds: live.responders)
 
                 if !live.responders.isEmpty {
                     Text("\(live.responders.map { model.name(of: $0) }.joined(separator: " and ")) \(live.responders.count == 1 ? "is" : "are") responding")
@@ -302,4 +327,46 @@ struct SOSAlertView: View {
     }
 
     struct Pin: Identifiable { let id = UUID(); let coord: CLLocationCoordinate2D }
+}
+
+/// One-tap calls to family members who saved a number (used during an SOS).
+struct CallList: View {
+    @EnvironmentObject var model: AppModel
+    @Environment(\.openURL) var openURL
+    let title: String
+    var exclude: String?
+    var skip: String? = nil
+    var firstIds: [String] = []
+
+    var body: some View {
+        let people = model.everyone
+            .filter { $0.id != exclude && $0.id != skip && !($0.phone ?? "").isEmpty }
+            .sorted { (firstIds.contains($0.id) ? 0 : 1, $0.name) < (firstIds.contains($1.id) ? 0 : 1, $1.name) }
+        if !people.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                SectionHeader(text: title)
+                VStack(spacing: 0) {
+                    ForEach(people) { m in
+                        Button {
+                            if let p = m.phone, let u = URL(string: "tel:\(p)") { openURL(u) }
+                        } label: {
+                            HStack(spacing: 12) {
+                                Avatar(member: m, size: 32)
+                                VStack(alignment: .leading) {
+                                    Text(m.name).foregroundStyle(.white)
+                                    if firstIds.contains(m.id) { Text("Responding").font(.caption).foregroundStyle(Theme.green) }
+                                }
+                                Spacer()
+                                Image(systemName: "phone.fill").foregroundStyle(Theme.green)
+                            }
+                            .padding(.vertical, 10).padding(.horizontal, 14)
+                        }
+                        .accessibilityLabel("Call \(m.name)")
+                        if m.id != people.last?.id { Divider().padding(.leading, 58) }
+                    }
+                }
+                .background(Theme.card, in: RoundedRectangle(cornerRadius: 22))
+            }
+        }
+    }
 }
