@@ -35,7 +35,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -106,19 +105,19 @@ fun App(joinLink: String?, onAskPermissions: () -> Unit) {
 @Composable
 private fun MainTabs() {
     val st by Walkie.state.collectAsStateWithLifecycle()
-    var tab by rememberSaveable { mutableIntStateOf(0) }
+    val tab = st.tab
     var showBatteryGuide by rememberSaveable { mutableStateOf(!Walkie.prefs.batteryGuideDone) }
     Scaffold(
         containerColor = W.bg,
         bottomBar = {
             NavigationBar(containerColor = W.surface) {
                 val colors = NavigationBarItemDefaults.colors(indicatorColor = if (tab == 3) Color5C1F19 else W.secondaryContainer)
-                NavigationBarItem(tab == 0, { tab = 0 }, { Icon(Icons.Filled.Mic, null) }, label = { Text("Talk") }, colors = colors)
-                NavigationBarItem(tab == 1, { tab = 1 }, { Icon(Icons.Filled.History, null) }, label = { Text("History") }, colors = colors)
-                NavigationBarItem(tab == 2, { tab = 2 }, {
+                NavigationBarItem(tab == 0, { Walkie.setTab(0) }, { Icon(Icons.Filled.Mic, null) }, label = { Text("Talk") }, colors = colors)
+                NavigationBarItem(tab == 1, { Walkie.setTab(1) }, { Icon(Icons.Filled.History, null) }, label = { Text("History") }, colors = colors)
+                NavigationBarItem(tab == 2, { Walkie.setTab(2) }, {
                     BadgedBox(badge = { if (st.pending.isNotEmpty()) Badge { Text("${st.pending.size}") } }) { Icon(Icons.Filled.Groups, null) }
                 }, label = { Text("Family") }, colors = colors)
-                NavigationBarItem(tab == 3, { tab = 3 }, { Icon(Icons.Filled.Shield, null) }, label = { Text("Safety") }, colors = colors)
+                NavigationBarItem(tab == 3, { Walkie.setTab(3) }, { Icon(Icons.Filled.Shield, null) }, label = { Text("Safety") }, colors = colors)
             }
         },
     ) { pad ->

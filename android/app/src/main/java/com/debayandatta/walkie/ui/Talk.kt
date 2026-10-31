@@ -25,6 +25,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.VolumeOff
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Schedule
@@ -75,29 +77,48 @@ fun TalkScreen() {
         }
         // Channel chips
         Row(Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            st.channels.forEach { c ->
+            (st.groupChannels + st.personalChannels).forEach { c ->
                 val sel = c.id == ch?.id
-                FilterChip(selected = sel, onClick = { Walkie.select(c.id) }, label = { Text(c.name) },
-                    leadingIcon = if (sel) ({ Icon(Icons.Filled.Check, null, Modifier.size(18.dp)) }) else null,
+                FilterChip(selected = sel, onClick = { Walkie.select(c.id) }, label = { Text(st.title(c)) },
+                    leadingIcon = when {
+                        c.isPersonal -> ({ Icon(Icons.Filled.Lock, null, Modifier.size(16.dp)) })
+                        sel -> ({ Icon(Icons.Filled.Check, null, Modifier.size(18.dp)) })
+                        else -> null
+                    },
                     colors = FilterChipDefaults.filterChipColors(selectedContainerColor = W.secondaryContainer, selectedLabelColor = W.onSecondaryContainer, selectedLeadingIconColor = W.onSecondaryContainer))
             }
         }
-        // Who's on duty
+        if (ch != null && ch.isPersonal) {
+            Row(Modifier.padding(horizontal = 16.dp, vertical = 8.dp).fillMaxWidth().background(W.secondaryContainer, RoundedCornerShape(16.dp))
+                .padding(start = 16.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Filled.Lock, null, tint = W.onSecondaryContainer, modifier = Modifier.size(18.dp))
+                Text("Only ${st.title(ch)} hears you", color = W.onSecondaryContainer, fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(start = 10.dp).weight(1f))
+                TextButton(onClick = { Walkie.backToGroup() }, modifier = Modifier.height(48.dp)) {
+                    Text("Back to ${st.returnChannel?.let { st.title(it) } ?: "Family"}", color = W.primary, fontWeight = FontWeight.SemiBold)
+                }
+            }
+        }
+        // Who's on duty — tap someone to talk to them only
         if (ch != null) {
             val others = ch.members
             val onDuty = others.count { it.duty || (it.id == me && st.onDuty) }
             Row(Modifier.padding(16.dp).fillMaxWidth().background(W.surface, RoundedCornerShape(28.dp)).padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                 Row(Modifier.horizontalScroll(rememberScrollState())) {
-                    others.take(6).forEachIndexed { i, m ->
+                    others.forEachIndexed { i, m ->
                         val speaking = st.remote?.userId == m.id || (m.id == me && st.talk.active)
+                        val tappable = m.id != me && !ch.isPersonal && !st.talk.active
                         Box(Modifier.padding(start = if (i == 0) 0.dp else 4.dp)
-                            .border(2.5.dp, if (speaking) W.primary else androidx.compose.ui.graphics.Color.Transparent, CircleShape).padding(3.dp)) {
+                            .border(2.5.dp, if (speaking) W.primary else androidx.compose.ui.graphics.Color.Transparent, CircleShape)
+                            .clickable(enabled = tappable, onClickLabel = "Talk to ${m.name} only") { Walkie.buzz(15); Walkie.talkPrivately(m) }
+                            .padding(3.dp)) {
                             Avatar(m, size = 36.dp, dimmed = !m.duty && m.id != me)
                         }
                     }
                 }
                 Column(Modifier.padding(start = 12.dp).weight(1f)) {
                     Text(if (!st.connected) "Connecting…" else "$onDuty of ${ch.members.size} on duty", fontSize = 16.sp, fontWeight = FontWeight.Medium)
+                    if (!ch.isPersonal && ch.members.size > 2) Text("Tap someone to talk to them only", fontSize = 12.sp, color = W.textMuted)
                     val off = ch.members.filter { !it.duty && it.id != me }.map { it.name }
                     if (off.isNotEmpty()) Text("${off.joinToString()} ${if (off.size == 1) "is" else "are"} off", fontSize = 14.sp, color = W.textMuted, maxLines = 1)
                 }

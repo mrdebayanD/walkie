@@ -44,8 +44,8 @@ class Api(val baseUrl: String, var token: String?) {
 
     private suspend fun json(method: String, path: String, body: JSONObject? = null) = JSONObject(String(call(method, path, body)))
 
-    suspend fun join(code: String, name: String): Pair<String, Member> {
-        val o = json("POST", "v1/join", JSONObject().put("code", code).put("name", name).put("platform", "android"))
+    suspend fun join(code: String, name: String, phone: String): Pair<String, Member> {
+        val o = json("POST", "v1/join", JSONObject().put("code", code).put("name", name).put("phone", phone).put("platform", "android"))
         return o.getString("token") to Member.from(o.getJSONObject("user"))
     }
 
@@ -66,6 +66,18 @@ class Api(val baseUrl: String, var token: String?) {
     suspend fun channels(): List<Channel> = json("GET", "v1/channels").optJSONArray("channels").objects().map(Channel::from)
     suspend fun users(): List<Member> = json("GET", "v1/users").optJSONArray("users").objects().map(Member::from)
     suspend fun approve(id: String) { call("POST", "v1/users/$id/approve") }
+
+    /** Opens (or returns) the personal channel with another member. */
+    suspend fun personalChannel(userId: String): Channel =
+        Channel.from(json("POST", "v1/direct", JSONObject().put("userId", userId)).getJSONObject("channel"))
+
+    /** Admin: fix someone's name or phone number. */
+    suspend fun updateUser(id: String, name: String?, phone: String?) {
+        val b = JSONObject()
+        name?.let { b.put("name", it) }
+        phone?.let { b.put("phone", it) }
+        call("PUT", "v1/users/$id", b)
+    }
     suspend fun removeUser(id: String) { call("DELETE", "v1/users/$id") }
 
     suspend fun createChannel(name: String, color: String, memberIds: List<String>): Channel =

@@ -56,18 +56,20 @@ Invite codes: 10 characters (Crockford base32), one use, expire after 24 hours. 
 | --- | --- | --- | --- |
 | `GET /healthz` | anyone | | `ok` |
 | `GET /join?c=CODE` | anyone | | HTML page with open/install help |
-| `POST /v1/join` | anyone (rate limited) | `{code, name, platform: "ios"\|"android"}` | `{token, user}` |
+| `POST /v1/join` | anyone (rate limited) | `{code, name, phone?, platform: "ios"\|"android"}` | `{token, user}` |
 | `GET /v1/me` | any token | | `{user, settings, server}` |
 | `PUT /v1/me` | any token | `{name?, phone?}` (phone: digits, optional leading +) | `{user}` |
 | `PUT /v1/me/push` | any token | `{apnsPtt?, apnsAlert?, fcm?, apnsSandbox?}` | `{ok}` |
 | `GET /v1/users` | active | | `{users}` (admin also sees pending) |
 | `POST /v1/users/{id}/approve` | admin | | `{user}` |
-| `DELETE /v1/users/{id}` | admin | | `{ok}` |
-| `GET /v1/channels` | active | | `{channels}` (with members and presence) |
+| `DELETE /v1/users/{id}` | admin | | `{ok}` (also deletes their personal channels) |
+| `PUT /v1/users/{id}` | admin | `{name?, phone?}` | `{user}` |
+| `GET /v1/channels` | active | | `{channels}` (with members and presence; each has `kind`: `group` or `direct`) |
+| `POST /v1/direct` | active | `{userId}` | `{channel}` — opens (or returns) the personal channel with that person |
 | `POST /v1/channels` | admin | `{name, color, memberIds}` | `{channel}` |
 | `PATCH /v1/channels/{id}` | admin | `{name?, color?}` | `{channel}` |
 | `PUT /v1/channels/{id}/members` | admin | `{memberIds}` | `{channel}` |
-| `DELETE /v1/channels/{id}` | admin | | `{ok}` (not the default channel) |
+| `DELETE /v1/channels/{id}` | admin (group) or either member (personal) | | `{ok}` (not the default channel) |
 | `POST /v1/invites` | admin | `{channelId, label}` | `{invite, code, url, appUrl}` |
 | `GET /v1/invites` | admin | | `{invites}` (unused, unexpired) |
 | `DELETE /v1/invites/{id}` | admin | | `{ok}` |
@@ -132,6 +134,16 @@ Authenticated with the bearer header. Only `active` users may connect. Text mess
 | Someone starts talking | APNs `pushtotalk` to the PTT token: `{"aps":{}, "type":"tx", "channel", "txId", "speaker"}` | `{type: "tx", channel, txId, speaker}` |
 | SOS | APNs alert, `interruption-level: critical` if `WALKIE_APNS_CRITICAL=1` else `time-sensitive`, repeated every 30 s (max 10) until acknowledged | `{type: "sos", sosId, sender}`, repeated the same way |
 | SOS resolved | APNs alert `time-sensitive` | `{type: "sos_resolved", sosId, sender, resolution}` |
+
+## Personal channels
+
+A personal (`direct`) channel holds exactly two people. It works like any channel for talking and history, but:
+
+- only those two receive its audio, events and pushes, and only they can list it or replay its clips — the admin can't;
+- it can't be renamed, given members, or invited to; either person can delete it (with its history);
+- removing either person from the family deletes it.
+
+Clips are stored unencrypted on the server, so whoever runs the server could still read the files on disk.
 
 ## History
 

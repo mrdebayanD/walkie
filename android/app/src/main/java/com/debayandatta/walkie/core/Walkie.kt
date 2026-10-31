@@ -61,6 +61,9 @@ data class UiState(
     val clips: Map<String, List<Clip>> = emptyMap(),
     val played: Set<String> = emptySet(),
     val pending: List<Member> = emptyList(),
+    val tab: Int = 0,
+    /** Group channel to go back to after talking to one person. */
+    val returnChannelId: String? = null,
     val connected: Boolean = false,
     val talk: Talk = Talk.Idle,
     val remote: Remote? = null,
@@ -77,6 +80,12 @@ data class UiState(
 ) {
     val selectedChannel: Channel? get() = channels.firstOrNull { it.id == selectedChannelId } ?: channels.firstOrNull()
     val defaultChannel: Channel? get() = channels.firstOrNull { it.isDefault }
+    val groupChannels: List<Channel> get() = channels.filter { !it.isPersonal }
+    val personalChannels: List<Channel> get() = channels.filter { it.isPersonal }.sortedBy { it.title(me?.id) }
+    val returnChannel: Channel? get() = channels.firstOrNull { it.id == returnChannelId } ?: defaultChannel
+    fun title(c: Channel) = c.title(me?.id)
+    val everyone: List<Member> get() = channels.flatMap { it.members }.distinctBy { it.id }.sortedBy { it.name }
+    fun unheard(channelId: String) = (clips[channelId] ?: emptyList()).count { it.id !in played && it.userId != me?.id }
     val isAdmin get() = me?.isAdmin == true
     fun member(id: String): Member? = channels.asSequence().flatMap { it.members }.firstOrNull { it.id == id }
     fun nameOf(id: String) = member(id)?.name ?: "Someone"
@@ -219,7 +228,7 @@ object Walkie {
         return null
     }
 
-    suspend fun join(link: String, code: String?, name: String) {
+    suspend fun join(link: String, code: String?, name: String, phone: String = "") {
         setError(null)
         val (server, c) = parseInvite(link, code) ?: run {
             setError("That doesn't look like an invite link. Paste the whole link, or the server address and code.")
@@ -227,7 +236,7 @@ object Walkie {
         }
         try {
             val a = Api(server, null)
-            val (token, _) = a.join(c, name)
+            val (token, _) = a.join(c, name, phone)
             prefs.server = server
             prefs.token = token
             a.token = token
@@ -316,6 +325,38 @@ object Walkie {
         scope.launch { loadClips(channelId) }
     }
 
+    fun setTab(t: Int) = _state.update { it.copy(tab = t) }
+
+    /** Tap a person: talk to them only (their personal channel), on the Talk tab. */
+    fun talkPrivately(m: Member) {
+        scope.launch {
+            val api = api ?: return@launch
+            try {
+                val c = api.personalChannel(m.id)
+                val back = s.selectedChannel?.takeIf { !it.isPersonal }?.id
+                if (back != null) _state.update { it.copy(returnChannelId = back) }
+                loadChannels()
+                select(c.id)
+                setTab(0)
+            } catch (e: Exception) { setError(e.message) }
+        }
+    }
+
+    fun backToGroup() {
+        s.returnChannel?.let { select(it.id) }
+        _state.update { it.copy(returnChannelId = null) }
+    }
+
+    fun deletePersonal(c: Channel) {
+        scope.launch {
+            runCatching { api?.deleteChannel(c.id) }
+            if (s.selectedChannelId == c.id) s.defaultChannel?.let { select(it.id) }
+            loadChannels()
+        }
+    }
+
+    suspend fun loadAllClips() { s.channels.forEach { loadClips(it.id) } }
+
     fun hasMic() = ContextCompat.checkSelfPermission(app, android.Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
 
     // ---------------------------------------------------------------- loading
@@ -385,6 +426,8 @@ object Walkie {
             }
             is RelayEvent.FloorTaken -> {
                 if (e.userId == s.me?.id) return
+                // Already hearing someone on another channel: this one goes to History (unheard).
+                if (s.remote != null) return
                 audio.newStream()
                 _state.update { it.copy(remote = Remote(e.channel, e.txId, e.userId, e.name, System.currentTimeMillis())) }
                 if (s.muted) buzz(60)
@@ -394,7 +437,7 @@ object Walkie {
                     if (grantedTx == e.txId) stopLocalTalk()
                 } else if (s.remote?.txId == e.txId) {
                     remoteEnded()
-                    if (e.clipId != null && !s.muted && s.onDuty) markPlayed(e.clipId)
+                    if (e.clipId != null && !s.muted) markPlayed(e.clipId)
                 }
                 scope.launch { loadClips(e.channel) }
             }

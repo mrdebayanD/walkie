@@ -30,6 +30,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material3.Badge
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.ui.graphics.Color
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -48,9 +56,11 @@ import java.time.format.FormatStyle
 @Composable
 fun HistoryScreen() {
     val st by Walkie.state.collectAsStateWithLifecycle()
-    val ch = st.selectedChannel
+    // History has its own channel choice (starts on the Talk channel).
+    var chId by rememberSaveable { mutableStateOf(st.selectedChannelId) }
+    val ch = st.channels.firstOrNull { it.id == chId } ?: st.selectedChannel
     var filter by rememberSaveable { mutableIntStateOf(0) }
-    LaunchedEffect(ch?.id) { ch?.let { Walkie.loadClips(it.id) } }
+    LaunchedEffect(st.channels.size) { Walkie.loadAllClips() }
     val all = ch?.let { st.clips[it.id] } ?: emptyList()
     val missed = all.filter { it.id !in st.played && it.userId != st.me?.id }
     val shown = when (filter) { 1 -> missed; 2 -> all.filter { it.mode == "sos" }; else -> all }
@@ -69,12 +79,23 @@ fun HistoryScreen() {
             Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 20.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text("History", fontSize = 32.sp, fontWeight = FontWeight.Medium)
-                    Text("Clips delete themselves after ${st.settings.clipTtlHours} hours", fontSize = 14.sp, color = W.textMuted)
+                    Text(if (ch?.isPersonal == true) "Only you and ${st.title(ch)} can hear these" else "Clips delete themselves after ${st.settings.clipTtlHours} hours",
+                        fontSize = 14.sp, color = W.textMuted)
                 }
                 if (missed.isNotEmpty() && ch != null) {
                     Button(onClick = { Walkie.playMissed(ch.id) }, colors = ButtonDefaults.buttonColors(containerColor = W.primary, contentColor = W.onPrimary)) {
                         Icon(Icons.Filled.PlayArrow, null, Modifier.size(18.dp)); Text(" Play ${missed.size}")
                     }
+                }
+            }
+            Row(Modifier.horizontalScroll(rememberScrollState()).padding(start = 16.dp, end = 16.dp, top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                (st.groupChannels + st.personalChannels).forEach { c ->
+                    val n = st.unheard(c.id)
+                    FilterChip(selected = c.id == ch?.id, onClick = { chId = c.id },
+                        label = { Text(st.title(c)) },
+                        leadingIcon = if (c.isPersonal) ({ Icon(Icons.Filled.Lock, null, Modifier.size(16.dp)) }) else null,
+                        trailingIcon = if (n > 0) ({ Badge(containerColor = Color(0xFFA6C8FF), contentColor = Color(0xFF00315F)) { Text("$n") } }) else null,
+                        colors = FilterChipDefaults.filterChipColors(selectedContainerColor = W.secondaryContainer, selectedLabelColor = W.onSecondaryContainer))
                 }
             }
             SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(16.dp)) {

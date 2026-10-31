@@ -63,6 +63,7 @@ fun JoinScreen(prefill: String?) {
     var link by rememberSaveable { mutableStateOf(prefill ?: "") }
     var code by rememberSaveable { mutableStateOf("") }
     var name by rememberSaveable { mutableStateOf("") }
+    var phone by rememberSaveable { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     LaunchedEffect(prefill) { if (prefill != null) link = prefill }
 
@@ -83,9 +84,12 @@ fun JoinScreen(prefill: String?) {
         OutlinedTextField(name, { name = it }, label = { Text("Your name") }, placeholder = { Text("e.g. Ma, Baba, Didi") }, singleLine = true,
             colors = fieldColors(), keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words), modifier = Modifier.fillMaxWidth(),
             supportingText = { Text("This is how the family sees you.") })
+        OutlinedTextField(phone, { phone = it }, label = { Text("Your phone number") }, placeholder = { Text("+91 98765 43210") }, singleLine = true,
+            colors = fieldColors(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone), modifier = Modifier.fillMaxWidth(),
+            supportingText = { Text("So your family can call you if you send an SOS.") })
         st.error?.let { Text(it, color = W.error) }
         Button(
-            onClick = { busy = true; scope.launch { Walkie.join(link, code, name.trim()); busy = false } },
+            onClick = { busy = true; scope.launch { Walkie.join(link, code, name.trim(), phone.trim()); busy = false } },
             enabled = !busy && link.isNotBlank() && name.isNotBlank(),
             modifier = Modifier.fillMaxWidth().height(52.dp),
             colors = ButtonDefaults.buttonColors(containerColor = W.primary, contentColor = W.onPrimary),

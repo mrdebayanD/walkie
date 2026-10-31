@@ -77,6 +77,7 @@ fun SafetyScreen() {
     val scope = rememberCoroutineScope()
     var progress by remember { mutableFloatStateOf(0f) }
     var countdown by remember { mutableStateOf(false) }
+    var profile by remember { mutableStateOf(false) }
     val askLocation = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {}
     LaunchedEffect(Unit) { askLocation.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)) }
 
@@ -92,10 +93,19 @@ fun SafetyScreen() {
             }
         }
 
+        if (st.me?.phone.isNullOrEmpty()) {
+            Row(Modifier.padding(horizontal = 16.dp).fillMaxWidth().background(W.amber.copy(alpha = 0.15f), RoundedCornerShape(24.dp))
+                .clickable { profile = true }.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("Add your phone number so the family can call you during an SOS", fontSize = 14.sp, modifier = Modifier.weight(1f))
+                Text("Add", color = W.primary, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(start = 12.dp))
+            }
+        }
+
         Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
             val mine = st.mySos
             if (mine != null) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp), modifier = Modifier.padding(24.dp)) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp),
+                    modifier = Modifier.verticalScroll(rememberScrollState()).padding(24.dp)) {
                     Text("SOS sent", fontSize = 28.sp, fontWeight = FontWeight.Bold, color = W.error)
                     val n = mine.responders.size
                     Text(if (n == 0) "Alerting ${mine.recipients.size} family members…" else "$n responding: ${mine.responders.joinToString { st.nameOf(it) }}",
@@ -103,6 +113,7 @@ fun SafetyScreen() {
                     Button(onClick = { Walkie.resolveMySos(false) }, modifier = Modifier.fillMaxWidth().height(56.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = W.primary, contentColor = W.onPrimary)) { Text("I'm safe", fontSize = 16.sp, fontWeight = FontWeight.SemiBold) }
                     TextButton(onClick = { Walkie.resolveMySos(true) }) { Text("It was a false alarm", color = W.textMuted) }
+                    CallList("Call someone", skip = null, first = mine.responders)
                 }
             } else {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(20.dp)) {
@@ -133,7 +144,7 @@ fun SafetyScreen() {
             }
         }
 
-        Group(Modifier.padding(bottom = 16.dp)) {
+        if (st.mySos == null) Group(Modifier.padding(bottom = 16.dp)) {
             listOf("Loud alert to all ${maxOf(0, (st.defaultChannel?.members?.size ?: 1) - 1)} family members", "Live location shared", "15-second clip recorded").forEachIndexed { i, t ->
                 if (i > 0) Divider()
                 Row(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -144,6 +155,34 @@ fun SafetyScreen() {
         }
     }
     if (countdown) CountdownScreen { countdown = false }
+    if (profile) ProfileDialog(null) { profile = false }
+}
+
+/** One-tap calls to family members who saved a number (used during an SOS). */
+@Composable
+fun CallList(title: String, skip: String?, first: List<String>) {
+    val st by Walkie.state.collectAsStateWithLifecycle()
+    val ctx = LocalContext.current
+    val people = st.everyone.filter { it.id != st.me?.id && it.id != skip && !it.phone.isNullOrEmpty() }
+        .sortedWith(compareBy({ if (it.id in first) 0 else 1 }, { it.name }))
+    if (people.isEmpty()) return
+    Column(Modifier.fillMaxWidth()) {
+        Text(title, color = W.primary, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, modifier = Modifier.padding(start = 16.dp, bottom = 8.dp))
+        Column(Modifier.fillMaxWidth().background(W.surface, RoundedCornerShape(24.dp))) {
+            people.forEachIndexed { i, m ->
+                if (i > 0) Divider()
+                Row(Modifier.fillMaxWidth().clickable(onClickLabel = "Call ${m.name}") { ctx.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:${m.phone}"))) }
+                    .padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Avatar(m, size = 32.dp)
+                    Column(Modifier.padding(start = 12.dp).weight(1f)) {
+                        Text(m.name)
+                        if (m.id in first) Text("Responding", fontSize = 12.sp, color = W.primary)
+                    }
+                    Icon(Icons.Filled.Call, null, tint = W.primary)
+                }
+            }
+        }
+    }
 }
 
 @Composable
@@ -226,7 +265,7 @@ fun AlertScreen(sos: SosEvent) {
             }
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Button(onClick = { sender?.phone?.let { ctx.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:$it"))) } },
-                    enabled = sender?.phone != null, modifier = Modifier.weight(1f).height(56.dp),
+                    enabled = !sender?.phone.isNullOrEmpty(), modifier = Modifier.weight(1f).height(56.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = W.primary, contentColor = W.onPrimary)) {
                     Icon(Icons.Filled.Call, null); Text("  Call ${sos.userName}", fontWeight = FontWeight.Bold, maxLines = 1)
                 }
@@ -241,6 +280,10 @@ fun AlertScreen(sos: SosEvent) {
             }
             OutlinedButton(onClick = { ctx.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:112"))) }, modifier = Modifier.fillMaxWidth().height(56.dp),
                 border = androidx.compose.foundation.BorderStroke(1.5.dp, W.error)) { Text("Call 112", color = W.error, fontWeight = FontWeight.Bold) }
+            if (sender?.phone.isNullOrEmpty()) {
+                Text("${sos.userName} hasn't saved a phone number. Call someone who may be nearby:", fontSize = 13.sp, color = W.textMuted)
+            }
+            CallList("Call family", skip = sos.userId, first = sos.responders)
             if (sos.responders.isNotEmpty()) {
                 Text("${sos.responders.joinToString(" and ") { st.nameOf(it) }} ${if (sos.responders.size == 1) "is" else "are"} responding",
                     color = W.textMuted, modifier = Modifier.fillMaxWidth().background(W.surface, RoundedCornerShape(22.dp)).padding(14.dp))

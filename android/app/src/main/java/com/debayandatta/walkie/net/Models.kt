@@ -39,14 +39,21 @@ data class Channel(
     val name: String,
     val color: String,
     val isDefault: Boolean,
+    val kind: String,
     val members: List<Member>,
 ) {
+    /** Exactly two people; nobody else (not even the admin) can hear or replay it. */
+    val isPersonal get() = kind == "direct"
+    fun other(me: String?): Member? = if (isPersonal) members.firstOrNull { it.id != me } else null
+    fun title(me: String?): String = if (isPersonal) other(me)?.name ?: "Personal" else name
+
     companion object {
         fun from(o: JSONObject) = Channel(
             id = o.getString("id"),
             name = o.optString("name"),
             color = o.optString("color", "blue"),
             isDefault = o.optBoolean("isDefault"),
+            kind = o.optString("kind", "group"),
             members = o.optJSONArray("members").objects().map(Member::from),
         )
     }

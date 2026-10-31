@@ -5,8 +5,11 @@ A private push-to-talk walkie-talkie for the family. iPhone and Android, over mo
 - **Press and hold** to talk. **Double-tap** for hands-free (tap again to stop; stops by itself after 60 s).
 - iPhone: works from the **lock screen** through Apple's Push to Talk.
 - **History**: every message is kept for replay, then deleted automatically (default 24 hours; the admin can change it).
-- **Channels**: Family is pinned as the default; the admin can add channels for others.
-- **Invites**: link, QR code or text message. Nobody joins until the admin approves.
+- **Channels**: Family is pinned as the default; the admin can add channels for others. People are added from inside each channel.
+- **Talk to one person**: tap someone's picture to talk to them only. Nobody else (not even the admin) can hear or replay it in the app.
+- **History per channel**, with unheard counts.
+- **Invites**: link, QR code or text message, always into a specific channel. Nobody joins until the admin approves.
+- **Phone numbers**: asked at sign-up; one-tap calls from the member list and during SOS.
 - **SOS**: hold 3 s, then a 5 s countdown with Cancel. Sends a loud alert, live location and a 15-second clip to the family. Sender taps "I'm safe" to close it.
 - Built for old phones: idle cost is near zero (no polling, mic only while talking, location only during SOS).
 

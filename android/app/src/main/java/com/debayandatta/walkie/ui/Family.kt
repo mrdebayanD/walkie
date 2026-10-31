@@ -26,9 +26,14 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Call
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.PersonRemove
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.automirrored.filled.Send
@@ -44,7 +49,6 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
@@ -84,21 +88,14 @@ import kotlinx.coroutines.launch
 fun FamilyScreen() {
     val st by Walkie.state.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
-    var editing by remember { mutableStateOf<Channel?>(null) }
+    var opened by remember { mutableStateOf<String?>(null) }
     var creating by remember { mutableStateOf(false) }
-    var inviting by remember { mutableStateOf(false) }
     var profile by remember { mutableStateOf(false) }
     var ttlMenu by remember { mutableStateOf(false) }
-    val people = st.channels.flatMap { it.members }.distinctBy { it.id }.sortedBy { it.name }
 
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-            Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 20.dp), verticalAlignment = Alignment.Bottom) {
-                Text("Family", fontSize = 32.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
-                if (st.isAdmin) OutlinedButton(onClick = { inviting = true }) {
-                    Icon(Icons.Filled.PersonAdd, null, Modifier.size(18.dp), tint = W.primary); Text("  Add people", color = W.primary)
-                }
-            }
+            Text("Family", fontSize = 32.sp, fontWeight = FontWeight.Medium, modifier = Modifier.padding(start = 16.dp, top = 20.dp))
 
             if (st.isAdmin && st.pending.isNotEmpty()) {
                 SectionTitle("Waiting for you")
@@ -119,40 +116,29 @@ fun FamilyScreen() {
 
             SectionTitle("Channels")
             Group {
-                st.channels.forEachIndexed { i, c ->
+                st.groupChannels.forEachIndexed { i, c ->
                     if (i > 0) Divider()
-                    Row(Modifier.fillMaxWidth().clickable { if (st.isAdmin) editing = c else Walkie.select(c.id) }.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Box(Modifier.size(40.dp).background(if (c.isDefault) W.primary else W.channel(c.color).copy(alpha = 0.3f), RoundedCornerShape(14.dp)), contentAlignment = Alignment.Center) {
-                            if (c.isDefault) Icon(Icons.Filled.Home, null, tint = W.onPrimary) else Text("#", color = W.channel(c.color), fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                        }
-                        Column(Modifier.padding(start = 16.dp).weight(1f)) {
-                            Text(c.name, fontSize = 16.sp, fontWeight = FontWeight.Medium)
-                            Text(if (c.isDefault) "Pinned · ${c.members.size} members" else "${c.members.size} members", fontSize = 14.sp, color = W.textMuted)
-                        }
-                        if (c.isDefault) Text("Default", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = W.onSecondaryContainer,
-                            modifier = Modifier.background(W.secondaryContainer, RoundedCornerShape(12.dp)).padding(horizontal = 10.dp, vertical = 4.dp))
-                    }
+                    ChannelRow(c, st.title(c), selected = c.id == st.selectedChannelId) { opened = c.id }
                 }
             }
+            if (st.isAdmin) Text("Open a channel to add people to it.", fontSize = 13.sp, color = W.textMuted, modifier = Modifier.padding(start = 32.dp, top = 8.dp))
 
-            SectionTitle("Members")
-            Group {
-                people.forEachIndexed { i, m ->
-                    if (i > 0) Divider()
-                    Row(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Avatar(m)
-                        Column(Modifier.padding(start = 16.dp).weight(1f)) {
-                            Text(if (m.id == st.me?.id) "${m.name} (you)" else m.name, fontSize = 16.sp)
-                            Text(platformName(m) + if (m.isAdmin) " · Admin" else "", fontSize = 14.sp, color = W.textMuted)
-                        }
-                        Text(if (m.duty) "On duty" else if (m.online) "Online" else "Off", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = if (m.duty) W.primary else W.textMuted)
-                        if (st.isAdmin && m.id != st.me?.id) {
-                            IconButton(onClick = { scope.launch { runCatching { Walkie.api?.removeUser(m.id) }; Walkie.loadChannels() } }) {
-                                Icon(Icons.Filled.Close, contentDescription = "Remove ${m.name}", tint = W.textMuted)
+            if (st.personalChannels.isNotEmpty()) {
+                SectionTitle("Personal")
+                Group {
+                    st.personalChannels.forEachIndexed { i, c ->
+                        if (i > 0) Divider()
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(Modifier.weight(1f)) {
+                                ChannelRow(c, st.title(c), selected = c.id == st.selectedChannelId) { Walkie.select(c.id); Walkie.setTab(0) }
+                            }
+                            IconButton(onClick = { Walkie.deletePersonal(c) }) {
+                                Icon(Icons.Filled.Close, contentDescription = "Delete personal channel with ${st.title(c)}", tint = W.textMuted)
                             }
                         }
                     }
                 }
+                Text("Only the two of you can hear or replay these.", fontSize = 13.sp, color = W.textMuted, modifier = Modifier.padding(start = 32.dp, top = 8.dp))
             }
 
             SectionTitle("This phone")
@@ -178,7 +164,10 @@ fun FamilyScreen() {
                     }
                 }
                 Divider()
-                Row(Modifier.fillMaxWidth().clickable { profile = true }.padding(16.dp)) { Text("My name and phone number", fontSize = 16.sp) }
+                Row(Modifier.fillMaxWidth().clickable { profile = true }.padding(16.dp)) {
+                    Text("My name and phone", fontSize = 16.sp, modifier = Modifier.weight(1f))
+                    Text(st.me?.phone ?: "Add phone", fontSize = 16.sp, color = if (st.me?.phone == null) W.amber else W.textMuted)
+                }
             }
             TextButton(onClick = { Walkie.signOut() }, modifier = Modifier.padding(16.dp)) { Text("Leave this family", color = W.error) }
             Text("Connected to ${st.server?.removePrefix("https://") ?: "—"}", fontSize = 12.sp, color = W.textMuted, modifier = Modifier.padding(start = 28.dp, bottom = 96.dp))
@@ -190,9 +179,93 @@ fun FamilyScreen() {
         }
     }
     if (creating) ChannelEditor(null) { creating = false }
-    editing?.let { c -> ChannelEditor(c) { editing = null } }
-    if (inviting) InviteDialog(st.defaultChannel?.id) { inviting = false }
-    if (profile) ProfileDialog { profile = false }
+    opened?.let { id -> ChannelScreen(id) { opened = null } }
+    if (profile) ProfileDialog(null) { profile = false }
+}
+
+@Composable
+private fun ChannelRow(c: Channel, title: String, selected: Boolean, onClick: () -> Unit) {
+    val st by Walkie.state.collectAsStateWithLifecycle()
+    Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+        if (c.isPersonal) {
+            Avatar(c.other(st.me?.id), size = 40.dp)
+        } else {
+            Box(Modifier.size(40.dp).background(if (c.isDefault) W.primary else W.channel(c.color).copy(alpha = 0.3f), RoundedCornerShape(14.dp)), contentAlignment = Alignment.Center) {
+                if (c.isDefault) Icon(Icons.Filled.Home, null, tint = W.onPrimary) else Text("#", color = W.channel(c.color), fontWeight = FontWeight.Bold, fontSize = 18.sp)
+            }
+        }
+        Column(Modifier.padding(start = 16.dp).weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (c.isPersonal) Icon(Icons.Filled.Lock, null, tint = W.textMuted, modifier = Modifier.size(14.dp).padding(end = 4.dp))
+                Text(title, fontSize = 16.sp, fontWeight = FontWeight.Medium)
+            }
+            Text(when { c.isPersonal -> "Personal"; c.isDefault -> "Pinned · ${c.members.size} members"; else -> "${c.members.size} members" },
+                fontSize = 14.sp, color = W.textMuted)
+        }
+        if (c.isDefault) Text("Default", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = W.onSecondaryContainer,
+            modifier = Modifier.background(W.secondaryContainer, RoundedCornerShape(12.dp)).padding(horizontal = 10.dp, vertical = 4.dp))
+        if (selected) Icon(Icons.Filled.Check, contentDescription = "Current channel", tint = W.primary, modifier = Modifier.padding(start = 8.dp))
+    }
+}
+
+/** One channel: who's in it, call or talk privately to anyone, and (admin) add people and edit. */
+@Composable
+fun ChannelScreen(channelId: String, onClose: () -> Unit) {
+    val st by Walkie.state.collectAsStateWithLifecycle()
+    val ctx = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var editing by remember { mutableStateOf(false) }
+    var editMember by remember { mutableStateOf<Member?>(null) }
+    val c = st.channels.firstOrNull { it.id == channelId }
+    FullScreen(onClose) {
+        Row(Modifier.fillMaxWidth().padding(start = 4.dp, end = 8.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onClose) { Icon(Icons.Filled.Close, contentDescription = "Close") }
+            Text(c?.name ?: "Channel", fontSize = 22.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+            if (st.isAdmin && c != null) TextButton(onClick = { editing = true }) { Text("Edit", color = W.primary) }
+        }
+        if (c == null) { Text("This channel was removed.", color = W.textMuted, modifier = Modifier.padding(16.dp)); return@FullScreen }
+        Column(Modifier.verticalScroll(rememberScrollState()).imePadding()) {
+            Row(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilledTonalButton(onClick = { Walkie.select(c.id); Walkie.setTab(0); onClose() }) { Icon(Icons.Filled.Mic, null, Modifier.size(18.dp)); Text("  Talk here") }
+                FilledTonalButton(onClick = { Walkie.select(c.id); Walkie.setTab(1); onClose() }) { Icon(Icons.Filled.History, null, Modifier.size(18.dp)); Text("  History") }
+            }
+            SectionTitle("Members · ${c.members.size}")
+            Group {
+                c.members.forEachIndexed { i, m ->
+                    if (i > 0) Divider()
+                    val isMe = m.id == st.me?.id
+                    Row(Modifier.fillMaxWidth().clickable(enabled = st.isAdmin) { editMember = m }.padding(start = 16.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically) {
+                        Avatar(m, dimmed = !m.duty && !isMe)
+                        Column(Modifier.padding(start = 16.dp).weight(1f)) {
+                            Text(if (isMe) "${m.name} (you)" else m.name, fontSize = 16.sp)
+                            Text(listOfNotNull(platformName(m), if (m.isAdmin) "Admin" else null, m.phone).joinToString(" · "), fontSize = 14.sp, color = W.textMuted)
+                        }
+                        if (!isMe) {
+                            m.phone?.let { p ->
+                                IconButton(onClick = { ctx.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:$p"))) }) {
+                                    Icon(Icons.Filled.Call, contentDescription = "Call ${m.name}", tint = W.primary)
+                                }
+                            }
+                            IconButton(onClick = { Walkie.talkPrivately(m); onClose() }) {
+                                Icon(Icons.Filled.Lock, contentDescription = "Talk to ${m.name} only", tint = W.text)
+                            }
+                            if (st.isAdmin) IconButton(onClick = { scope.launch { runCatching { Walkie.api?.removeUser(m.id) }; Walkie.loadChannels() } }) {
+                                Icon(Icons.Filled.PersonRemove, contentDescription = "Remove ${m.name}", tint = W.textMuted)
+                            }
+                        }
+                    }
+                }
+            }
+            if (st.isAdmin) {
+                SectionTitle("Add people to ${c.name}")
+                Group { InvitePanel(c.id) }
+            }
+            Spacer(Modifier.height(32.dp))
+        }
+    }
+    if (editing && c != null) ChannelEditor(c) { editing = false }
+    editMember?.let { m -> ProfileDialog(m) { editMember = null } }
 }
 
 private fun platformName(m: Member) = if (m.platform == "ios") "iPhone" else "Android"
@@ -221,7 +294,7 @@ fun ChannelEditor(channel: Channel?, onClose: () -> Unit) {
     var color by remember { mutableStateOf(channel?.color ?: "blue") }
     val selected = remember { mutableStateListOf<String>().apply { addAll(channel?.members?.map { it.id } ?: listOfNotNull(st.me?.id)) } }
     var busy by remember { mutableStateOf(false) }
-    val people = st.channels.flatMap { it.members }.distinctBy { it.id }.sortedBy { it.name }
+    val people = st.everyone
 
     FullScreen(onClose) {
         Row(Modifier.fillMaxWidth().padding(start = 4.dp, end = 12.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -273,41 +346,15 @@ fun ChannelEditor(channel: Channel?, onClose: () -> Unit) {
                     }
                 }
             }
-            if (channel != null) {
-                SectionTitle("Invite someone new")
-                Group { InvitePanel(channel.id) }
-                if (!channel.isDefault) {
-                    TextButton(onClick = { scope.launch { runCatching { Walkie.api?.deleteChannel(channel.id) }; Walkie.loadChannels(); onClose() } },
-                        modifier = Modifier.padding(16.dp)) { Text("Delete channel", color = W.error) }
-                }
-            } else {
-                Text("Create the channel first, then invite new people to it.", fontSize = 13.sp, color = W.textMuted, modifier = Modifier.padding(32.dp, 12.dp))
+            Text(if (channel == null) "To bring in someone new, create the channel, open it, and use Add people."
+                 else "To bring in someone new, use Add people on the channel page.",
+                fontSize = 13.sp, color = W.textMuted, modifier = Modifier.padding(horizontal = 32.dp, vertical = 12.dp))
+            if (channel != null && !channel.isDefault) {
+                TextButton(onClick = { scope.launch { runCatching { Walkie.api?.deleteChannel(channel.id) }; Walkie.loadChannels(); onClose() } },
+                    modifier = Modifier.padding(16.dp)) { Text("Delete channel", color = W.error) }
             }
-            Text("Only you can add or remove people. Family stays your default channel.", fontSize = 13.sp, color = W.textMuted, modifier = Modifier.padding(horizontal = 32.dp, vertical = 12.dp))
             Spacer(Modifier.height(32.dp))
         }
-    }
-}
-
-@Composable
-fun InviteDialog(channelId: String?, onClose: () -> Unit) {
-    val st by Walkie.state.collectAsStateWithLifecycle()
-    var ch by remember { mutableStateOf(channelId ?: st.defaultChannel?.id) }
-    FullScreen(onClose) {
-        Row(Modifier.fillMaxWidth().padding(start = 4.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onClose) { Icon(Icons.Filled.Close, contentDescription = "Close") }
-            Text("Add people", fontSize = 22.sp, fontWeight = FontWeight.Medium)
-        }
-        Row(Modifier.padding(16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            st.channels.forEach { c ->
-                val sel = c.id == ch
-                Text(c.name, color = if (sel) W.onSecondaryContainer else W.textMuted,
-                    modifier = Modifier.background(if (sel) W.secondaryContainer else Color.Transparent, RoundedCornerShape(8.dp))
-                        .border(1.dp, if (sel) Color.Transparent else W.outline, RoundedCornerShape(8.dp)).clickable { ch = c.id }
-                        .padding(horizontal = 16.dp, vertical = 8.dp))
-            }
-        }
-        ch?.let { id -> androidx.compose.runtime.key(id) { Group { InvitePanel(id) } } }
     }
 }
 
@@ -388,26 +435,28 @@ private fun qr(text: String, size: Int = 512): Bitmap {
 }
 
 @Composable
-fun ProfileDialog(onClose: () -> Unit) {
+fun ProfileDialog(member: Member?, onClose: () -> Unit) {
     val st by Walkie.state.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
-    var name by remember { mutableStateOf(st.me?.name ?: "") }
-    var phone by remember { mutableStateOf(st.me?.phone ?: "") }
+    val who = member ?: st.me
+    var name by remember { mutableStateOf(who?.name ?: "") }
+    var phone by remember { mutableStateOf(who?.phone ?: "") }
     var err by remember { mutableStateOf<String?>(null) }
     Dialog(onDismissRequest = onClose) {
         Column(Modifier.background(W.surface, RoundedCornerShape(28.dp)).padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("You", fontSize = 22.sp, fontWeight = FontWeight.Medium)
+            Text(if (member == null || member.id == st.me?.id) "You" else member.name, fontSize = 22.sp, fontWeight = FontWeight.Medium)
             OutlinedTextField(name, { name = it }, label = { Text("Name") }, singleLine = true, colors = fieldColors())
             OutlinedTextField(phone, { phone = it }, label = { Text("Phone number") }, placeholder = { Text("+91 98765 43210") }, singleLine = true,
                 colors = fieldColors(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                supportingText = { Text("Your family can call you from an SOS alert.") })
+                supportingText = { Text("The family can call this number from the member list and SOS alerts.") })
             err?.let { Text(it, color = W.error) }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                 TextButton(onClick = onClose) { Text("Cancel", color = W.textMuted) }
                 Button(onClick = {
                     scope.launch {
                         try {
-                            Walkie.api?.updateMe(name.trim(), phone.trim())?.let { Walkie.updateMeLocal(it) }
+                            if (member != null && member.id != st.me?.id) Walkie.api?.updateUser(member.id, name.trim(), phone.trim())
+                            else Walkie.api?.updateMe(name.trim(), phone.trim())?.let { Walkie.updateMeLocal(it) }
                             Walkie.loadChannels()
                             onClose()
                         } catch (e: Exception) { err = e.message }
