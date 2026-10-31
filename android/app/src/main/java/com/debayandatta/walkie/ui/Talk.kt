@@ -102,7 +102,7 @@ fun TalkScreen() {
         // Who's on duty — tap someone to talk to them only
         if (ch != null) {
             val others = ch.members
-            val onDuty = others.count { it.duty || (it.id == me && st.onDuty) }
+            val onDuty = others.count { if (it.id == me) st.onDuty else it.duty }
             Row(Modifier.padding(16.dp).fillMaxWidth().background(W.surface, RoundedCornerShape(28.dp)).padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                 Row(Modifier.horizontalScroll(rememberScrollState())) {
                     others.forEachIndexed { i, m ->

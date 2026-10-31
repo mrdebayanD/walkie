@@ -312,6 +312,13 @@ final class AppModel: ObservableObject {
 
     private func dutyChanged() {
         relay?.setDuty(onDuty)
+        if let myId = me?.id { // show my own change right away everywhere (avatars, counts)
+            for i in channels.indices {
+                for j in channels[i].members.indices where channels[i].members[j].id == myId {
+                    channels[i].members[j].duty = onDuty
+                }
+            }
+        }
         if onDuty, let ch = selectedChannel { ptt.join(channelId: ch.id, name: title(ch)) } else { ptt.leave() }
     }
 

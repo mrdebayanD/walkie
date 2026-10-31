@@ -300,7 +300,10 @@ object Walkie {
 
     fun setOnDuty(on: Boolean) {
         prefs.onDuty = on
-        _state.update { it.copy(onDuty = on) }
+        _state.update { st ->
+            val myId = st.me?.id
+            st.copy(onDuty = on, channels = st.channels.map { c -> c.copy(members = c.members.map { m -> if (m.id == myId) m.copy(duty = on) else m }) })
+        }
         relay?.updateDuty(on)
         if (!on) DutyService.stop(app)
         updateConnection()

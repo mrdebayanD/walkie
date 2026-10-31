@@ -50,7 +50,7 @@ struct TalkView: View {
             return n == 1 ? "1 person is hearing you" : "\(n) people are hearing you"
         }
         if !model.connected { return "Connecting…" }
-        let on = ch.members.filter { $0.duty || $0.id == model.me?.id && model.onDuty }.count
+        let on = ch.members.filter { $0.id == model.me?.id ? model.onDuty : $0.duty }.count
         return "\(on) of \(ch.members.count) on duty"
     }
 
