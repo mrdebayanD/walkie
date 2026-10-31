@@ -41,12 +41,12 @@ import kotlinx.coroutines.withContext
 enum class Phase { LOADING, NEEDS_JOIN, PENDING, READY }
 
 sealed class Talk {
-    data object Idle : Talk()
-    data class Requesting(val mode: TalkMode) : Talk()
-    data class Talking(val mode: TalkMode, val since: Long) : Talk()
-
-    val mode: TalkMode? get() = when (this) { is Requesting -> mode; is Talking -> mode; Idle -> null }
+    open val mode: TalkMode? get() = null
     val active get() = this != Idle
+
+    data object Idle : Talk()
+    data class Requesting(override val mode: TalkMode) : Talk()
+    data class Talking(override val mode: TalkMode, val since: Long) : Talk()
 }
 
 data class Remote(val channel: String, val txId: Long, val userId: String, val name: String, val since: Long)

@@ -231,7 +231,7 @@ struct SOSAlertView: View {
                 HStack(spacing: 14) {
                     Avatar(member: sender, name: live.userName, size: 52)
                     VStack(alignment: .leading) {
-                        Text(live.isActive ? "SOS · \(live.createdAt, style: .relative) ago".uppercased() : "SOS CLOSED")
+                        Text(live.isActive ? "SOS · \(RelativeDateTimeFormatter().localizedString(for: live.createdAt, relativeTo: Date()))".uppercased() : "SOS CLOSED")
                             .font(.footnote.weight(.bold))
                         Text(live.isActive ? "\(live.userName) needs help" : (live.resolution == "false_alarm" ? "False alarm" : "\(live.userName) is safe"))
                             .font(.title2.bold())
