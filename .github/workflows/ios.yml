@@ -9,7 +9,7 @@ jobs:
     # Xcode. Installing on a phone still needs signing (Xcode or TestFlight).
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Generate Xcode project
         working-directory: ios
         run: |
@@ -23,8 +23,13 @@ jobs:
           xcodebuild build -project Walkie.xcodeproj -scheme Walkie \
             -destination 'generic/platform=iOS' -configuration Debug \
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO DEVELOPMENT_TEAM="" \
-            | tee build.log | grep -E "error:|warning: .*deprecated|BUILD (SUCCEEDED|FAILED)" || true
-          grep -q "BUILD SUCCEEDED" build.log
+            > build.log 2>&1 || true
+          if ! grep -q "BUILD SUCCEEDED" build.log; then
+            # GitHub keeps only 10 annotations per step, so join lines with %0A.
+            echo "::error::$(grep -E 'error:' build.log | sed 's#.*/ios/Walkie/##' | sort -u | head -150 | awk '{printf "%s%%0A", $0}')"
+            echo "::warning::$(tail -40 build.log | awk '{printf "%s%%0A", $0}')"
+            exit 1
+          fi
       - uses: actions/upload-artifact@v4
         if: always()
         with:
