@@ -3,6 +3,8 @@ on:
   push:
     paths: ["android/**", ".github/workflows/android.yml"]
   workflow_dispatch:
+permissions:
+  contents: write   # to publish the APK on the "android-latest" release
 jobs:
   build:
     runs-on: ubuntu-latest   # has the Android SDK preinstalled
@@ -36,3 +38,14 @@ jobs:
         with:
           name: walkie-android-apk
           path: android/app/build/outputs/apk/release/*.apk
+      - name: Publish to the "android-latest" release
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp android/app/build/outputs/apk/release/app-release.apk walkie.apk
+          gh release view android-latest >/dev/null 2>&1 || \
+            gh release create android-latest --prerelease --title "Android test build" \
+              --notes "Latest Android build from main. Download walkie.apk and install it on the phone."
+          gh release upload android-latest walkie.apk --clobber
+          gh release edit android-latest --notes "Latest Android build from main ($(git rev-parse --short HEAD), $(date -u +'%Y-%m-%d %H:%M UTC')). Download walkie.apk and install it on the phone."
