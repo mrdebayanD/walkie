@@ -264,6 +264,12 @@ final class AppModel: ObservableObject {
             base.scheme = scheme
             base.host = host
             base.port = comps.port
+            // Keep a path prefix (cloud groups live at https://host/g/<id>);
+            // drop the trailing /join of an invite page link.
+            var path = comps.path
+            if path.hasSuffix("/") { path.removeLast() }
+            if path.hasSuffix("/join") { path.removeLast(5) }
+            base.path = path
             guard let u = base.url else { return nil }
             if let c = q["c"], !c.isEmpty { return (u, c) }
             if let code, !code.isEmpty { return (u, code) }

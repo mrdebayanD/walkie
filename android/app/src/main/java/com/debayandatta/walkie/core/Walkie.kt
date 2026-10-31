@@ -238,7 +238,10 @@ object Walkie {
             return server.trimEnd('/') to c
         }
         if ((u.scheme == "https" || u.scheme == "http") && u.host != null) {
-            val base = "${u.scheme}://${u.host}${if (u.port > 0) ":${u.port}" else ""}"
+            // Keep a path prefix (cloud groups live at https://host/g/<id>);
+            // drop the trailing /join of an invite page link.
+            val path = (u.path ?: "").trimEnd('/').removeSuffix("/join")
+            val base = "${u.scheme}://${u.host}${if (u.port > 0) ":${u.port}" else ""}$path"
             val c = u.getQueryParameter("c")?.takeIf { it.isNotBlank() } ?: code?.takeIf { it.isNotBlank() } ?: return null
             return base to c
         }

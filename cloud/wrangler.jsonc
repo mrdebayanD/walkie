@@ -1,0 +1,28 @@
+{
+  // Hollo on Cloudflare: one Worker, one Durable Object per group ("server"),
+  // and a Registry object that lists groups and holds console settings.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "hollo",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-01",
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "run_worker_first": true
+  },
+  "durable_objects": {
+    "bindings": [
+      { "name": "GROUP", "class_name": "Group" },
+      { "name": "REGISTRY", "class_name": "Registry" }
+    ]
+  },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["Group", "Registry"] }
+  ],
+  "vars": {
+    // iPhone app bundle id (push topic). Push secrets are set with
+    // `wrangler secret put` (see docs/CLOUD.md).
+    "APNS_BUNDLE_ID": "com.debayandatta.walkie"
+  },
+  "observability": { "enabled": true }
+}
