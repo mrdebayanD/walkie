@@ -118,7 +118,7 @@ extension PTTController: PTChannelManagerDelegate {
             self.joinedUUID = channelUUID
             let saved = self.channelNames[channelUUID] ?? self.restoredName(channelUUID)
             self.joinedChannelId = saved?.id
-            if reason == .channelRestored, self.wanted == nil, let saved { self.wanted = saved }
+            if reason != .developerRequest, self.wanted == nil, let saved { self.wanted = saved }
             if let id = saved?.id { self.delegate?.pttDidJoin(channelId: id) }
             self.reconcile() // the user may have changed their mind meanwhile
         }
