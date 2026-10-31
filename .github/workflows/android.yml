@@ -28,8 +28,8 @@ jobs:
           ./gradlew --no-daemon assembleRelease 2>&1 | tee build.log || {
             # Surface compiler errors as annotations (readable through the API).
             # GitHub keeps only 10 annotations per step, so join lines with %0A.
-            echo "::error::$(grep -E '^e: |What went wrong|^> |error:' build.log | sed 's#file:///home/runner/work/walkie/walkie/android/app/src/main/java/com/debayandatta/walkie/##' | head -150 | awk '{printf "%s%%0A", $0}')"
-            echo "::warning::$(grep -A12 'What went wrong' build.log | head -40 | awk '{printf "%s%%0A", $0}')"
+            echo "::error::$(grep -E '^e: |What went wrong|^> |error:|Error: |Errors? found|^\s+~|^\s+[A-Za-z].*\^' build.log | sed 's#file:///home/runner/work/walkie/walkie/android/app/src/main/java/com/debayandatta/walkie/##' | head -150 | awk '{printf "%s%%0A", $0}')"
+            echo "::warning::$(grep -B2 -A4 'Error: ' build.log | head -120 | awk '{printf "%s%%0A", $0}')"
             exit 1
           }
       - uses: actions/upload-artifact@v4
