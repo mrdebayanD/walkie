@@ -301,7 +301,7 @@ object Walkie {
     fun setOnDuty(on: Boolean) {
         prefs.onDuty = on
         _state.update { it.copy(onDuty = on) }
-        relay?.setDuty(on)
+        relay?.updateDuty(on)
         if (!on) DutyService.stop(app)
         updateConnection()
     }

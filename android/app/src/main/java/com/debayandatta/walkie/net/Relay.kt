@@ -88,7 +88,7 @@ class Relay(serverUrl: String, private val token: String) {
         socket.send(JSONObject().put("t", "hello").put("duty", duty).put("app", "android").toString())
     }
 
-    fun setDuty(on: Boolean) {
+    fun updateDuty(on: Boolean) {
         duty = on
         send(JSONObject().put("t", "duty").put("on", on))
     }
