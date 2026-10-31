@@ -1,4 +1,6 @@
-# Walkie
+# Hollo
+
+![Hollo icon](branding/hollo-icon-1024.png)
 
 A private push-to-talk walkie-talkie for the family. iPhone and Android, over mobile data, anywhere (Agartala ↔ Seattle works the same as across town).
 

@@ -11,7 +11,7 @@ The server needs very little: about 10 MB of memory when idle, almost no CPU, an
    - **Upgrade the account to Pay As You Go** (recommended). The same Always Free resources stay free, and the idle-reclaim rule is aimed at free-only accounts. The catch: if you ever create something outside the free limits, it is billed. Set a **budget alert of $1** (Billing › Budgets) so you'd know immediately.
    - **Stay free-only** and add a free uptime monitor (for example UptimeRobot on `https://YOURNAME.duckdns.org/healthz`) so you get an email if the server is stopped, then start it again in the console.
 
-   Also note: in June 2026 Oracle quietly cut the free Arm allowance to 2 OCPUs and 12 GB total ([InfoQ](https://infoq.com/news/2026/07/oracle-cloud-free-tier-limits/)). Walkie needs far less, but keep any Arm server at **1 OCPU / 6 GB or less**.
+   Also note: in June 2026 Oracle quietly cut the free Arm allowance to 2 OCPUs and 12 GB total ([InfoQ](https://infoq.com/news/2026/07/oracle-cloud-free-tier-limits/)). Hollo needs far less, but keep any Arm server at **1 OCPU / 6 GB or less**.
 
 ## 1. Create the server (about 15 minutes)
 

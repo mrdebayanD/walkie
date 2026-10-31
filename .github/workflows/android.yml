@@ -45,7 +45,7 @@ jobs:
         run: |
           cp android/app/build/outputs/apk/release/app-release.apk walkie.apk
           gh release view android-latest >/dev/null 2>&1 || \
-            gh release create android-latest --prerelease --title "Android test build" \
-              --notes "Latest Android build from main. Download walkie.apk and install it on the phone."
+            gh release create android-latest --prerelease --title "Hollo for Android (test build)" \
+              --notes "Latest Hollo Android build. Download walkie.apk and install it on the phone."
           gh release upload android-latest walkie.apk --clobber
-          gh release edit android-latest --notes "Latest Android build from main ($(git rev-parse --short HEAD), $(date -u +'%Y-%m-%d %H:%M UTC')). Download walkie.apk and install it on the phone."
+          gh release edit android-latest --notes "Latest Hollo Android build ($(git rev-parse --short HEAD), $(date -u +'%Y-%m-%d %H:%M UTC')). Download walkie.apk and install it on the phone."

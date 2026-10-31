@@ -33,7 +33,7 @@ targets:
     info:
       path: Walkie/Info.plist
       properties:
-        CFBundleDisplayName: Walkie
+        CFBundleDisplayName: Hollo
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         LSRequiresIPhoneOS: true
@@ -42,8 +42,8 @@ targets:
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         UIUserInterfaceStyle: Dark
         UIBackgroundModes: [push-to-talk, remote-notification]
-        NSMicrophoneUsageDescription: Walkie uses the microphone only while you hold the talk button, or while hands-free is on.
-        NSLocationWhenInUseUsageDescription: Walkie shares your location with your family only when you send an SOS.
+        NSMicrophoneUsageDescription: Hollo uses the microphone only while you hold the talk button, or while hands-free is on.
+        NSLocationWhenInUseUsageDescription: Hollo shares your location with your family only when you send an SOS.
         NSCameraUsageDescription: Scan a family invite QR code.
         ITSAppUsesNonExemptEncryption: false
         CFBundleURLTypes:

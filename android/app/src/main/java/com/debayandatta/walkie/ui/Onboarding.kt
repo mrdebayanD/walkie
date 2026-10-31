@@ -126,19 +126,19 @@ fun BatteryGuide(onDone: () -> Unit) {
     val pm = ctx.getSystemService(PowerManager::class.java)
     val exempt = pm.isIgnoringBatteryOptimizations(ctx.packageName)
     val brandSteps = when {
-        "xiaomi" in brand || "redmi" in brand || "poco" in brand -> "Settings › Apps › Walkie › Autostart: ON, and Battery saver: No restrictions."
-        "vivo" in brand || "iqoo" in brand -> "Settings › Battery › Background power consumption › Walkie: Allow. Also allow Auto-start."
-        "oppo" in brand || "realme" in brand || "oneplus" in brand -> "Settings › Apps › Walkie › Battery usage: Allow background activity and Auto launch."
-        "samsung" in brand -> "Settings › Apps › Walkie › Battery: Unrestricted. Also remove Walkie from Sleeping apps."
-        "huawei" in brand || "honor" in brand -> "Settings › Battery › App launch › Walkie: Manage manually, turn everything on."
-        else -> "Settings › Apps › Walkie › Battery: Unrestricted."
+        "xiaomi" in brand || "redmi" in brand || "poco" in brand -> "Settings › Apps › Hollo › Autostart: ON, and Battery saver: No restrictions."
+        "vivo" in brand || "iqoo" in brand -> "Settings › Battery › Background power consumption › Hollo: Allow. Also allow Auto-start."
+        "oppo" in brand || "realme" in brand || "oneplus" in brand -> "Settings › Apps › Hollo › Battery usage: Allow background activity and Auto launch."
+        "samsung" in brand -> "Settings › Apps › Hollo › Battery: Unrestricted. Also remove Hollo from Sleeping apps."
+        "huawei" in brand || "honor" in brand -> "Settings › Battery › App launch › Hollo: Manage manually, turn everything on."
+        else -> "Settings › Apps › Hollo › Battery: Unrestricted."
     }
     Dialog(onDismissRequest = onDone, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Column(Modifier.fillMaxWidth().padding(20.dp).background(W.surface, androidx.compose.foundation.shape.RoundedCornerShape(28.dp)).padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            Text("Keep Walkie listening", fontSize = 22.sp, fontWeight = FontWeight.Medium)
-            Text("Your phone may stop Walkie in the background to save battery. Walkie itself uses almost none while idle.", color = W.textMuted)
-            Text("1. Allow Walkie to run unrestricted", fontWeight = FontWeight.SemiBold)
+            Text("Keep Hollo listening", fontSize = 22.sp, fontWeight = FontWeight.Medium)
+            Text("Your phone may stop Hollo in the background to save battery. Hollo itself uses almost none while idle.", color = W.textMuted)
+            Text("1. Allow Hollo to run unrestricted", fontWeight = FontWeight.SemiBold)
             Button(
                 onClick = {
                     runCatching {
@@ -152,7 +152,7 @@ fun BatteryGuide(onDone: () -> Unit) {
             Text(brandSteps, color = W.textMuted)
             TextButton(onClick = {
                 runCatching { ctx.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${ctx.packageName}"))) }
-            }) { Text("Open Walkie's settings", color = W.primary) }
+            }) { Text("Open Hollo's settings", color = W.primary) }
             Button(onClick = onDone, modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.buttonColors(containerColor = W.primary, contentColor = W.onPrimary)) { Text("I've done this") }
         }

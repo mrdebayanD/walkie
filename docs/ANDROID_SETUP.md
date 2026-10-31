@@ -32,13 +32,13 @@ ssh ubuntu@SERVER_IP 'sudo install -o root -g walkie -m 0644 walkie.apk /etc/wal
 # in /etc/walkie/walkie.env:  WALKIE_ANDROID_APK=/etc/walkie/walkie.apk   then: sudo systemctl restart walkie
 ```
 
-The invite page then shows **Android: download Walkie** above the **Open in Walkie** button.
+The invite page then shows **Android: download Hollo** above the **Open in Hollo** button.
 
 ## 2. Install on a family phone
 
 1. Send `app-release.apk` by WhatsApp, Google Drive or a USB cable.
 2. Open it on the phone. Android asks to allow "Install unknown apps" for that app (WhatsApp/Files/Drive) — allow it once.
-3. Open Walkie, then open the invite link you sent them (or paste it).
+3. Open Hollo, then open the invite link you sent them (or paste it).
 
 ## 3. The battery settings (important on budget phones)
 
@@ -53,11 +53,11 @@ Do this in person when you install it — it's the difference between "always wo
 
 | Mode | What it does | Battery |
 | --- | --- | --- |
-| **On duty** (default) | A small notification "Walkie is on duty" keeps one quiet connection open; you hear people live, even locked | Very low: no polling, one keep-alive every 4 minutes |
+| **On duty** (default) | A small notification "Hollo is on duty" keeps one quiet connection open; you hear people live, even locked | Very low: no polling, one keep-alive every 4 minutes |
 | **Low-power mode** | No connection in the background; a push wakes the app when someone talks and it plays from the start (1–3 s late) | Lowest |
 | **Off duty** | You only hear people while the app is open | None |
 
 - Talk button: press and hold (after 0.3 s); **double-tap** for hands-free; tap to stop; stops by itself after 60 s.
 - After a phone restart, Android doesn't allow the app to turn its microphone service back on by itself: a notification asks the person to tap once to go back on duty. Pushes still wake it meanwhile.
-- SOS alerts use the alarm sound and appear over the lock screen. On Android 14+, showing over the lock screen needs "Full screen notifications" allowed for Walkie (Settings › Apps › Walkie › Notifications); otherwise it's a loud heads-up notification.
+- SOS alerts use the alarm sound and appear over the lock screen. On Android 14+, showing over the lock screen needs "Full screen notifications" allowed for Hollo (Settings › Apps › Hollo › Notifications); otherwise it's a loud heads-up notification.
 - Works on Android 8.0+ and is designed for 2 GB RAM phones: the Opus codec is pure Java (`android/concentus`, BSD licence), no extra native libraries.

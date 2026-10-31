@@ -187,7 +187,7 @@ var errInvite = errors.New("invalid invite")
 
 var joinPage = template.Must(template.New("join").Parse(`<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Join Walkie</title>
+<title>Join Hollo</title>
 <style>
 body{margin:0;font-family:-apple-system,BlinkMacSystemFont,Roboto,system-ui,sans-serif;background:#000;color:#fff;display:flex;min-height:100vh;align-items:center;justify-content:center}
 main{max-width:420px;padding:32px 24px}
@@ -198,16 +198,16 @@ a.alt{background:#2C2C2E;color:#fff;font-size:16px;margin:12px 0}
 .small{font-size:14px}
 code{font-size:22px;letter-spacing:2px;background:#1C1C1E;padding:8px 12px;border-radius:10px;display:inline-block}
 </style></head><body><main>
-<h1>Join Walkie</h1>
+<h1>Join Hollo</h1>
 <p>You have been invited to a private family walkie-talkie.</p>
 <p><b>1. Install the app</b> (skip if you have it):</p>
-{{if .APK}}<a class="btn alt" href="/install/walkie.apk">Android: download Walkie</a>{{end}}
-{{if .TestFlight}}<a class="btn alt" href="{{.TestFlight}}">iPhone: get Walkie on TestFlight</a>{{end}}
+{{if .APK}}<a class="btn alt" href="/install/walkie.apk">Android: download Hollo</a>{{end}}
+{{if .TestFlight}}<a class="btn alt" href="{{.TestFlight}}">iPhone: get Hollo on TestFlight</a>{{end}}
 {{if not (or .APK .TestFlight)}}<p>Ask the person who invited you for the iPhone (TestFlight) or Android install link.</p>{{end}}
 {{if .APK}}<p class="small">Android: open the downloaded file and allow "Install unknown apps" when asked.</p>{{end}}
 {{if .TestFlight}}<p class="small">iPhone: install TestFlight from the App Store first if it asks.</p>{{end}}
 <p><b>2. Then come back here and tap:</b></p>
-<a class="btn" href="{{.AppURL}}">Open in Walkie</a>
+<a class="btn" href="{{.AppURL}}">Open in Hollo</a>
 <p>Or open the app and type this code:</p>
 <p><code>{{.Code}}</code></p>
 <p>Server: {{.Server}}</p>

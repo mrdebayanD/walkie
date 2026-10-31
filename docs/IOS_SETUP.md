@@ -41,12 +41,12 @@ Debug builds from Xcode use Apple's **sandbox** push service; the app tells the 
 
 ## 4. Give it to the family (TestFlight)
 
-1. [App Store Connect](https://appstoreconnect.apple.com) › Apps › **+** › New App › iOS, name "Walkie" (or any free name), the bundle ID above, SKU `walkie`.
+1. [App Store Connect](https://appstoreconnect.apple.com) › Apps › **+** › New App › iOS, name "Hollo" (or any free name), the bundle ID above, SKU `walkie`.
 2. In Xcode: Product › **Archive** › Distribute App › **TestFlight & App Store** › Upload.
 3. App Store Connect › TestFlight:
    - **Internal testing** (up to 100 people who are on your developer team): fastest, no review. Each person needs to be added under Users and Access first.
    - **External testing** (up to 10,000, by email or a public link): needs a short beta review the first time (usually about a day).
-4. Family installs the **TestFlight** app from the App Store, taps your invite, then installs Walkie.
+4. Family installs the **TestFlight** app from the App Store, taps your invite, then installs Hollo.
 
 TestFlight builds expire after **90 days**: upload a new build before then (a calendar reminder every ~80 days helps).
 
@@ -57,7 +57,7 @@ Once set up, every change to the iPhone app builds, signs and uploads itself to 
 One-time setup, about 15 minutes, after your Apple Developer membership is **active**:
 
 1. **App ID with capabilities** — developer.apple.com › Certificates, IDs & Profiles › Identifiers › **+** › App IDs › App › Bundle ID `com.debayandatta.walkie`. Tick **Push Notifications**, **Push to Talk**, **Time Sensitive Notifications**. Register.
-2. **App record** — [App Store Connect](https://appstoreconnect.apple.com) › Apps › **+** › New App: iOS, name `Walkie` (if taken, e.g. `Walkie Family`), language English, bundle ID `com.debayandatta.walkie`, SKU `walkie`. Access: Full.
+2. **App record** — [App Store Connect](https://appstoreconnect.apple.com) › Apps › **+** › New App: iOS, name `Hollo` (if taken, e.g. `Hollo Family`), language English, bundle ID `com.debayandatta.walkie`, SKU `walkie`. Access: Full.
 3. **API key** — App Store Connect › Users and Access › **Integrations** › App Store Connect API › Team Keys › **+**. Name `GitHub`, access **App Manager**. Download the `.p8` (only once). Note the **Key ID** and the **Issuer ID** shown at the top.
 4. **Team ID** — developer.apple.com › Account › Membership details.
 5. **GitHub secrets** — github.com/mrdebayanD/walkie › Settings › Secrets and variables › Actions › **New repository secret**, four times:
@@ -73,7 +73,7 @@ One-time setup, about 15 minutes, after your Apple Developer membership is **act
 
 ### Getting it onto phones
 
-- **You (and anyone on your developer team)**: TestFlight › **Internal Testing** › create a group, add yourself. Install the **TestFlight** app on your iPhone; Walkie appears there. No review.
+- **You (and anyone on your developer team)**: TestFlight › **Internal Testing** › create a group, add yourself. Install the **TestFlight** app on your iPhone; Hollo appears there. No review.
 - **Family (external testing)**: TestFlight › **External Testing** › create a group "Family" › add the build. The first build needs Apple's **beta review** (usually under a day; fill in "What to test" and a contact). Then turn on **Public Link** and copy it (looks like `https://testflight.apple.com/join/AbCd1234`).
 - Put that link on the server so invite pages show it: add `WALKIE_TESTFLIGHT_URL=https://testflight.apple.com/join/AbCd1234` to `/etc/walkie/walkie.env` and restart.
 

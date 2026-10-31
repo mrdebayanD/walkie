@@ -35,7 +35,7 @@ struct TalkView: View {
     private var titleText: String {
         if case .talking = model.talk { return "You're talking" }
         if let r = model.remote { return "\(r.name) is talking" }
-        return model.selectedChannel.map(model.title) ?? "Walkie"
+        return model.selectedChannel.map(model.title) ?? "Hollo"
     }
 
     private func subtitle(_ ch: Channel?) -> String {

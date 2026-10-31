@@ -1,4 +1,4 @@
-# Walkie protocol (v1)
+# Hollo protocol (v1)
 
 This is the contract between the server and both apps. If you change one side, change the other and this file.
 
@@ -42,7 +42,7 @@ then repeat  : uint16 big-endian packet length, packet bytes
 ## Joining (no SMS, no passwords)
 
 1. The admin creates an invite (`POST /v1/invites`). The server returns a one-time `code` and a `url` like `https://walkie.example.org/join?c=ABCD2345XY`.
-2. The new person opens the link or scans its QR code. The web page offers an **Open in Walkie** button (`walkie://join?s=<server>&c=<code>`) and install help.
+2. The new person opens the link or scans its QR code. The web page offers an **Open in Hollo** button (`walkie://join?s=<server>&c=<code>`) and install help.
 3. The app calls `POST /v1/join` with the code and the person's name. It gets a token at once, with `status: "pending"`.
 4. The admin approves (`POST /v1/users/{id}/approve`). The person is added to the invite's channel and becomes `active`.
 

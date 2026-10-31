@@ -23,7 +23,7 @@ object Notifications {
     fun createChannels(ctx: Context) {
         val nm = ctx.getSystemService(NotificationManager::class.java)
         nm.createNotificationChannel(NotificationChannel(CH_DUTY, "On duty", NotificationManager.IMPORTANCE_LOW).apply {
-            description = "Shown while Walkie keeps listening for your family"
+            description = "Shown while Hollo keeps listening for your family"
             setShowBadge(false)
         })
         nm.createNotificationChannel(NotificationChannel(CH_SOS, "SOS alerts", NotificationManager.IMPORTANCE_HIGH).apply {
@@ -48,7 +48,7 @@ object Notifications {
         val stop = PendingIntent.getBroadcast(ctx, 1, Intent(ctx, NotificationActions::class.java).setAction(NotificationActions.OFF_DUTY), PendingIntent.FLAG_IMMUTABLE)
         return NotificationCompat.Builder(ctx, CH_DUTY)
             .setSmallIcon(R.drawable.ic_stat_walkie)
-            .setContentTitle("Walkie is on duty")
+            .setContentTitle("Hollo is on duty")
             .setContentText(text)
             .setOngoing(true)
             .setSilent(true)
@@ -95,7 +95,7 @@ object Notifications {
     fun bootReminder(ctx: Context) {
         ctx.getSystemService(NotificationManager::class.java).notify(ID_BOOT, NotificationCompat.Builder(ctx, CH_INFO)
             .setSmallIcon(R.drawable.ic_stat_walkie)
-            .setContentTitle("Walkie")
+            .setContentTitle("Hollo")
             .setContentText("Tap to go back on duty after the restart.")
             .setContentIntent(openApp(ctx))
             .setAutoCancel(true)

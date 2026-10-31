@@ -29,5 +29,5 @@ The apps were written without Xcode or the Android SDK, so they have **not been 
 - [ ] SOS: hold 3 s → countdown → Cancel works. Then a real one: every phone alerts, location opens in Maps, the clip plays, "I'm responding" shows for the sender, "I'm safe" clears it everywhere.
 - [ ] Mute speaker: vibrates instead of playing.
 - [ ] Remove a member: their app goes back to the join screen.
-- [ ] Battery: leave a phone on duty overnight; note battery used by Walkie in Settings › Battery.
+- [ ] Battery: leave a phone on duty overnight; note battery used by Hollo in Settings › Battery.
 - [ ] Network: test on Jio, Airtel and BSNL in a few parts of Agartala.

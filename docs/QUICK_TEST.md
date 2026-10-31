@@ -22,8 +22,8 @@ It prints your admin invite link. Check `https://random-words.trycloudflare.com/
 
 ## 2. Install the apps
 
-- **iPhone**: open `ios/` in Xcode as in docs/IOS_SETUP.md and Run on your phone. Open the admin link on the phone, Open in Walkie, Join.
-- **Android**: put `walkie.apk` next to the server (as above) and invite the phone from your iPhone (Family › Family › Add people). The invite page on the Android phone has a **Download Walkie** button, then **Open in Walkie**.
+- **iPhone**: open `ios/` in Xcode as in docs/IOS_SETUP.md and Run on your phone. Open the admin link on the phone, Open in Hollo, Join.
+- **Android**: put `walkie.apk` next to the server (as above) and invite the phone from your iPhone (Family › Family › Add people). The invite page on the Android phone has a **Download Hollo** button, then **Open in Hollo**.
 
 ## Limits of this setup
 

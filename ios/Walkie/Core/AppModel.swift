@@ -433,7 +433,7 @@ final class AppModel: ObservableObject {
             AVAudioSession.sharedInstance().requestRecordPermission { _ in }
             return
         case .denied:
-            errorMessage = "Microphone access is off. Turn it on in Settings › Walkie."
+            errorMessage = "Microphone access is off. Turn it on in Settings › Hollo."
             return
         default: break
         }

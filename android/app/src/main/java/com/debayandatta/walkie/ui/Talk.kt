@@ -68,7 +68,7 @@ fun TalkScreen() {
     val me = st.me?.id
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text("Walkie", fontSize = 24.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+            Text("Hollo", fontSize = 24.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
             IconButton(onClick = { Walkie.setMuted(!st.muted) }, modifier = Modifier.size(48.dp)) {
                 Icon(if (st.muted) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
                     contentDescription = if (st.muted) "Speaker muted on this phone. Unmute" else "Mute speaker on this phone",

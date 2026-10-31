@@ -5,7 +5,7 @@ You are the admin. Only you can add people, create channels, and change how long
 ## First time (you)
 
 1. Server running (docs/DEPLOY.md), iPhone app installed (docs/IOS_SETUP.md).
-2. Open the **admin invite link** the install script printed, tap **Open in Walkie**, type your name, Join. You're in, as admin, in the **Family** channel.
+2. Open the **admin invite link** the install script printed, tap **Open in Hollo**, type your name, Join. You're in, as admin, in the **Family** channel.
 3. Family tab › **My name and phone number**: add your number (shown to the family in SOS alerts so they can call you).
 
 ## Adding each person
@@ -17,7 +17,7 @@ People are always added to a channel.
    - **In person**: show the QR code; they scan it with the phone camera.
    - **Text message**: type their number and tap Send.
    - **WhatsApp etc.**: Share invite link.
-3. On their phone: install the app (TestFlight on iPhone, the APK on Android), open the link, **Open in Walkie**, type their name, Join. They see "Waiting for approval".
+3. On their phone: install the app (TestFlight on iPhone, the APK on Android), open the link, **Open in Hollo**, type their name, Join. They see "Waiting for approval".
 4. On your phone: Family tab › **Waiting for you** › **Approve**. They're in immediately.
 
 Invites work once and expire after 24 hours. Delete unused ones from the channel's Add People screen.
@@ -51,4 +51,4 @@ History is per channel: pick the channel (or a personal line) at the top. The nu
 - **Hold 3 seconds** → a **5-second countdown** with a big **Cancel** → then everyone in Family gets a loud alert with location and a 15-second recording.
 - If it was a mistake: **It was a false alarm**. When safe: **I'm safe**. Either clears it for everyone.
 - Everyone in the alert can **call the sender** and anyone else who saved a phone number, with one tap. The sender's screen also lists people to call.
-- In real danger, **call 112 first**. Walkie adds the family; it doesn't replace emergency services.
+- In real danger, **call 112 first**. Hollo adds the family; it doesn't replace emergency services.
