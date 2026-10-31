@@ -183,7 +183,11 @@ func (s *Server) handleJoin(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"token": token, "user": s.userView(out)})
 }
 
-var errInvite = errors.New("invalid invite")
+var (
+	errInvite        = errors.New("invalid invite")
+	errInviteUsed    = errors.New("invite already used")
+	errInviteExpired = errors.New("invite expired")
+)
 
 var joinPage = template.Must(template.New("join").Parse(`<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
