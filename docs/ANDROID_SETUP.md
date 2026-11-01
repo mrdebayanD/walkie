@@ -22,7 +22,7 @@ The first build may show a few compile errors (the code was written without the 
 
 ## Easiest: download the ready-made APK
 
-Every change builds automatically: **github.com/mrdebayanD/walkie › Releases › android-latest › walkie.apk** (you need to be logged in to GitHub, since the repo is private).
+Every change builds automatically. Permanent download link (no GitHub account needed): **https://github.com/mrdebayanD/walkie/releases/download/android-latest/walkie.apk** — it always serves the newest build; the release page shows its build number.
 
 To let family install it **from their invite link** without GitHub, put the APK on the server:
 

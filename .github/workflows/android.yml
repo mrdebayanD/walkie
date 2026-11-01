@@ -48,4 +48,4 @@ jobs:
             gh release create android-latest --prerelease --title "Hollo for Android (test build)" \
               --notes "Latest Hollo Android build. Download walkie.apk and install it on the phone."
           gh release upload android-latest walkie.apk --clobber
-          gh release edit android-latest --notes "Latest Hollo Android build ($(git rev-parse --short HEAD), $(date -u +'%Y-%m-%d %H:%M UTC')). Download walkie.apk and install it on the phone."
+          gh release edit android-latest --title "Hollo for Android, build ${{ github.run_number }}" --notes "Build ${{ github.run_number }} ($(git rev-parse --short HEAD), $(date -u +'%Y-%m-%d %H:%M UTC')). Download walkie.apk on the phone and install it; it updates the app in place. Permanent link: https://github.com/mrdebayanD/walkie/releases/download/android-latest/walkie.apk"

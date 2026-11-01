@@ -170,7 +170,9 @@ fun FamilyScreen() {
                 }
             }
             TextButton(onClick = { Walkie.signOut() }, modifier = Modifier.padding(16.dp)) { Text("Leave this family", color = W.error) }
-            Text("Connected to ${st.server?.removePrefix("https://") ?: "—"}", fontSize = 12.sp, color = W.textMuted, modifier = Modifier.padding(start = 28.dp, bottom = 96.dp))
+            val ctx = androidx.compose.ui.platform.LocalContext.current
+            val version = remember { runCatching { ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName }.getOrNull() ?: "?" }
+            Text("Connected to ${st.server?.removePrefix("https://") ?: "—"}\nHollo $version", fontSize = 12.sp, color = W.textMuted, modifier = Modifier.padding(start = 28.dp, bottom = 96.dp))
         }
         if (st.isAdmin) {
             ExtendedFloatingActionButton(onClick = { creating = true }, containerColor = W.primaryContainer, contentColor = W.onPrimaryContainer,
