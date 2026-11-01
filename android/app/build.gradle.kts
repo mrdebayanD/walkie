@@ -22,14 +22,23 @@ android {
         versionName = "1.0.$versionCode"
     }
 
+    signingConfigs {
+        // One fixed key for every test build, so a new APK installs over the
+        // old one. It lives in this (public) repo: fine for testing, but switch
+        // to a private key before publishing to the Play Store.
+        create("hollo") {
+            storeFile = file("hollo-test.keystore")
+            storePassword = "hollotest"
+            keyAlias = "hollo"
+            keyPassword = "hollotest"
+        }
+    }
     buildTypes {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            // Signed with the debug key so you can sideload without a Play account.
-            // Replace with your own keystore before publishing anywhere.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("hollo")
         }
     }
     compileOptions {
