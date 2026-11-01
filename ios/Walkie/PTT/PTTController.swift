@@ -12,6 +12,7 @@ protocol PTTControllerDelegate: AnyObject {
     func pttDidJoin(channelId: String)
     func pttDidLeave()
     func pttJoinFailed(_ message: String)
+    func pttTransmitFailed(_ message: String)
     func pttDidBeginTransmitting(fromSystemUI: Bool)
     func pttDidEndTransmitting()
     func pttAudioActivated()
@@ -181,6 +182,7 @@ extension PTTController: PTChannelManagerDelegate {
 
     nonisolated func channelManager(_ channelManager: PTChannelManager, failedToBeginTransmittingInChannel channelUUID: UUID, error: Error) {
         print("PTT transmit failed: \(error)")
+        Task { @MainActor in self.delegate?.pttTransmitFailed(error.localizedDescription) }
         Task { @MainActor in self.delegate?.pttDidEndTransmitting() }
     }
 

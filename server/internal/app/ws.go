@@ -24,6 +24,7 @@ type clientMsg struct {
 	Channel string `json:"channel,omitempty"`
 	Mode    string `json:"mode,omitempty"`
 	SosID   string `json:"sosId,omitempty"`
+	Msg     string `json:"msg,omitempty"`
 }
 
 func (s *Server) handleWS(w http.ResponseWriter, r *http.Request, u User) {
@@ -123,6 +124,13 @@ func (s *Server) handleWS(w http.ResponseWriter, r *http.Request, u User) {
 			if m.Duty != nil {
 				s.hub.setDuty(c, *m.Duty)
 			}
+		case "log":
+			// Diagnostics from the app (e.g. microphone or encoder problems).
+			msg := m.Msg
+			if len(msg) > 300 {
+				msg = msg[:300]
+			}
+			s.logf("app log %s (%s): %s", u.Name, hello.App, msg)
 		}
 	}
 }

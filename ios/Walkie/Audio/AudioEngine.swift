@@ -9,6 +9,10 @@ final class AudioEngine {
     /// Microphone level 0...1 for the waveform, ~every 60 ms.
     var onLevel: ((Float) -> Void)?
     var speakerMuted = false
+    /// Diagnostics (sent to the server log).
+    var onDiag: ((String) -> Void)?
+    private(set) var isCapturing = false
+    private var stats = (frames: 0, packets: 0, failed: 0)
 
     private let engine = AVAudioEngine()
     private let player = AVAudioPlayerNode()
@@ -76,8 +80,12 @@ final class AudioEngine {
         // No voice processing: it lowers playback volume, and half-duplex
         // talk (one speaker at a time) doesn't need echo cancellation.
         let hw = input.outputFormat(forBus: 0)
-        guard hw.sampleRate > 0, hw.channelCount > 0 else { return }
+        guard hw.sampleRate > 0, hw.channelCount > 0 else {
+            onDiag?("capture: microphone has no format yet (audio session not active)")
+            return
+        }
         converter = AVAudioConverter(from: hw, to: codec.pcmFormat)
+        stats = (0, 0, 0)
         pending = AVAudioPCMBuffer(pcmFormat: codec.pcmFormat, frameCapacity: OpusCodec.frameSize)
         pending?.frameLength = 0
         batch.removeAll()
@@ -86,15 +94,19 @@ final class AudioEngine {
             self?.workQ.async { self?.ingest(buf) }
         }
         capturing = true
+        isCapturing = true
         startEngineIfNeeded()
+        onDiag?("capture started: \(Int(hw.sampleRate)) Hz, \(hw.channelCount) ch, engine running: \(engine.isRunning)")
     }
 
     func stopCapture() {
         guard capturing else { return }
         capturing = false
+        isCapturing = false
         engine.inputNode.removeTap(onBus: 0)
         workQ.async { [weak self] in
             guard let self else { return }
+            self.onDiag?("capture stopped: \(self.stats.frames) mic buffers, \(self.stats.packets) packets encoded, \(self.stats.failed) encode failures")
             if !self.batch.isEmpty { self.onPackets?(self.batch) }
             self.batch.removeAll()
             self.pending = nil
@@ -103,6 +115,7 @@ final class AudioEngine {
 
     private func ingest(_ buf: AVAudioPCMBuffer) {
         guard capturing, let codec, let converter else { return }
+        stats.frames += 1
         let ratio = codec.pcmFormat.sampleRate / buf.format.sampleRate
         let cap = AVAudioFrameCount(Double(buf.frameLength) * ratio) + 64
         guard let out = AVAudioPCMBuffer(pcmFormat: codec.pcmFormat, frameCapacity: cap) else { return }
@@ -131,7 +144,13 @@ final class AudioEngine {
             pending.frameLength += AVAudioFrameCount(take)
             i += take
             if pending.frameLength == OpusCodec.frameSize {
-                if let pkt = codec.encode(pending) { batch.append(pkt) }
+                if let pkt = codec.encode(pending) {
+                    batch.append(pkt)
+                    stats.packets += 1
+                } else {
+                    stats.failed += 1
+                    if stats.failed == 1 { onDiag?("encode failed: \(codec.lastError ?? "no packet produced")") }
+                }
                 pending.frameLength = 0
                 if batch.count >= 3 {
                     onPackets?(batch)

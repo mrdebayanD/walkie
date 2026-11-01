@@ -819,6 +819,7 @@ export class Group extends DurableObject<Env> {
       }
       case "floor_request": await this.requestFloor(ws, a, String(m.channel ?? ""), String(m.mode ?? ""), m.sosId ? String(m.sosId) : undefined); break;
       case "floor_release": await this.releaseFloor(a); break;
+      case "log": console.log(`app log ${a.name}: ${String(m.msg ?? "").slice(0, 300)}`); break;
     }
   }
 

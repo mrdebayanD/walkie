@@ -98,6 +98,9 @@ final class AppModel: ObservableObject {
         playedClips = Set(UserDefaults.standard.stringArray(forKey: "playedClips") ?? [])
         let gate = self.gate
         audio.onPackets = { packets in gate.push(packets) }
+        audio.onDiag = { [weak self] msg in
+            Task { @MainActor in self?.diag(msg) }
+        }
         audio.onLevel = { [weak self] l in
             Task { @MainActor in self?.level = l }
         }
@@ -475,13 +478,29 @@ final class AppModel: ObservableObject {
         gate.request()
         if ptt.isJoined {
             ptt.beginTransmitting() // the system then calls pttDidBeginTransmitting + pttAudioActivated
+            // If Push to Talk doesn't hand us the microphone quickly, take it ourselves.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
+                guard let self, self.talk.isActive, !self.audio.isCapturing else { return }
+                self.diag("push to talk gave no audio session within 0.6 s; starting the microphone directly")
+                self.startCaptureDirectly()
+            }
         } else {
-            AudioEngine.activateForPlayback()
-            sessionActive = true
-            audio.sessionActivated()
-            audio.startCapture()
+            startCaptureDirectly()
         }
         relay?.requestFloor(channel: ch, mode: mode, sosId: sosId)
+    }
+
+    private func startCaptureDirectly() {
+        AudioEngine.activateForPlayback()
+        sessionActive = true
+        audio.sessionActivated()
+        audio.startCapture()
+    }
+
+    /// Diagnostics, written to the server's log.
+    func diag(_ msg: String) {
+        print("diag: \(msg)")
+        relay?.log(msg)
     }
 
     func endTalk() {
@@ -640,10 +659,16 @@ extension AppModel: PTTControllerDelegate {
         if onDuty && phase == .ready { onDuty = false } // left from the system UI
     }
 
+    func pttTransmitFailed(_ message: String) {
+        diag("push to talk transmit failed: \(message)")
+        if talk.isActive && !audio.isCapturing { startCaptureDirectly() }
+    }
+
     func pttJoinFailed(_ message: String) {
         // Stay on duty with the server (you still hear people while Hollo is
         // open); only the lock-screen button is missing. Retry on next change.
         print("Push to Talk unavailable: \(message)")
+        diag("push to talk join failed: \(message)")
     }
 
     func pttDidBeginTransmitting(fromSystemUI: Bool) {

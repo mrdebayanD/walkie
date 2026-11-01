@@ -89,6 +89,9 @@ final class Relay: NSObject, URLSessionWebSocketDelegate {
 
     func releaseFloor() { send(json: ["t": "floor_release"]) }
 
+    /// Diagnostics: the server writes these to its log.
+    func log(_ msg: String) { send(json: ["t": "log", "msg": msg]) }
+
     /// Sends up to 3 Opus packets in one message (protocol: 0x01, then u16 length + bytes).
     func sendAudio(_ packets: [Data]) {
         var d = Data([0x01])

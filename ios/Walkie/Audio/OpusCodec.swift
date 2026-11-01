@@ -30,6 +30,9 @@ final class OpusCodec {
 
     enum CodecError: Error { case unsupported, failed }
 
+    /// Why the last encode produced nothing (diagnostics).
+    private(set) var lastError: String?
+
     /// Encodes exactly one 960-frame buffer into one Opus packet.
     func encode(_ pcm: AVAudioPCMBuffer) -> Data? {
         let out = AVAudioCompressedBuffer(format: opusFormat, packetCapacity: 1, maximumPacketSize: 1275)
@@ -44,7 +47,10 @@ final class OpusCodec {
             inStatus.pointee = .haveData
             return pcm
         }
-        guard status != .error, out.packetCount > 0, let desc = out.packetDescriptions?.pointee else { return nil }
+        guard status != .error, out.packetCount > 0, let desc = out.packetDescriptions?.pointee else {
+            lastError = "status \(status.rawValue), packets \(out.packetCount), bytes \(out.byteLength), error \(err?.localizedDescription ?? "none")"
+            return nil
+        }
         return Data(bytes: out.data.advanced(by: Int(desc.mStartOffset)), count: Int(desc.mDataByteSize))
     }
 
